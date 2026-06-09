@@ -8,9 +8,24 @@ import { mkdir } from "node:fs/promises";
 import {
   BROWSER_USER_AGENT,
   PROFILE_DIR,
+  PROXY_ENABLED,
+  PROXY_PASSWORD,
+  PROXY_SERVER,
+  PROXY_USERNAME,
   REDDIT_SESSION_B64,
   REMOTE_MODE,
 } from "../config.js";
+
+/** Option proxy Playwright si un proxy résidentiel est configuré. */
+const PROXY_OPTION = PROXY_ENABLED
+  ? {
+      proxy: {
+        server: PROXY_SERVER,
+        ...(PROXY_USERNAME ? { username: PROXY_USERNAME } : {}),
+        ...(PROXY_PASSWORD ? { password: PROXY_PASSWORD } : {}),
+      },
+    }
+  : {};
 
 const COMMON_OPTIONS = {
   viewport: { width: 1280, height: 900 },
@@ -36,6 +51,7 @@ export async function launchContext(headless: boolean): Promise<BrowserContext> 
 
     const browser = await chromium.launch({
       headless: true,
+      ...PROXY_OPTION,
       args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
     });
     return browser.newContext({ ...COMMON_OPTIONS, storageState });
@@ -45,6 +61,7 @@ export async function launchContext(headless: boolean): Promise<BrowserContext> 
   return chromium.launchPersistentContext(PROFILE_DIR, {
     headless,
     ...COMMON_OPTIONS,
+    ...PROXY_OPTION,
     args: ["--disable-blink-features=AutomationControlled"],
   });
 }
@@ -55,6 +72,28 @@ export async function launchContext(headless: boolean): Promise<BrowserContext> 
 export async function getPage(context: BrowserContext): Promise<Page> {
   const existing = context.pages()[0];
   return existing ?? (await context.newPage());
+}
+
+/**
+ * Renvoie l'IP de sortie réellement vue par les sites (via une navigation de
+ * page, donc à travers le proxy s'il est configuré). Permet de vérifier que le
+ * proxy résidentiel fonctionne et quelle IP/zone Reddit voit.
+ */
+export async function getEgressIp(context: BrowserContext): Promise<string | null> {
+  const page = await context.newPage();
+  try {
+    const response = await page.goto("https://api.ipify.org?format=json", {
+      waitUntil: "domcontentloaded",
+      timeout: 20000,
+    });
+    if (!response) return null;
+    const body = (await response.json().catch(() => null)) as { ip?: string } | null;
+    return typeof body?.ip === "string" ? body.ip : null;
+  } catch {
+    return null;
+  } finally {
+    await page.close().catch(() => undefined);
+  }
 }
 
 /**

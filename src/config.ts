@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -56,6 +57,22 @@ export const APP_PASSWORD = process.env.APP_PASSWORD ?? "";
  * repasser en fenêtre visible si Reddit bloque l'automatisation headless.
  */
 export const HEADLESS = process.env.HEADLESS !== "false";
+
+/**
+ * Proxy résidentiel (Decodo, etc.) pour faire sortir le trafic Reddit par une
+ * IP résidentielle plutôt que l'IP datacenter du serveur. Recommandé : une
+ * session « sticky » géolocalisée (FR), PAS une rotation à chaque requête —
+ * un compte connecté qui saute d'IP en permanence est suspect pour Reddit.
+ *
+ * Format attendu :
+ *   PROXY_SERVER   = http://gate.decodo.com:7000   (hôte:port avec schéma)
+ *   PROXY_USERNAME = <utilisateur proxy>            (peut encoder pays/session)
+ *   PROXY_PASSWORD = <mot de passe proxy>
+ */
+export const PROXY_SERVER = process.env.PROXY_SERVER ?? "";
+export const PROXY_USERNAME = process.env.PROXY_USERNAME ?? "";
+export const PROXY_PASSWORD = process.env.PROXY_PASSWORD ?? "";
+export const PROXY_ENABLED = PROXY_SERVER.length > 0;
 
 /**
  * User-Agent de navigateur réaliste, utilisé à la fois par Playwright et par

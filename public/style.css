@@ -57,6 +57,11 @@ button.small {
   font-size: 13px;
 }
 
+.egress {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .status--ok {
   background: var(--ok-bg);
   color: var(--ok);

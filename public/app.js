@@ -4,6 +4,7 @@ const $ = (id) => document.getElementById(id);
 
 const els = {
   status: $("status"),
+  egress: $("egress"),
   switchAccount: $("switchAccount"),
   url: $("url"),
   loadPreview: $("loadPreview"),
@@ -58,6 +59,20 @@ async function loadStatus() {
   } catch {
     els.status.textContent = "Statut indisponible";
     els.status.className = "status status--err";
+  }
+}
+
+async function loadIp() {
+  els.egress.textContent = "IP : …";
+  try {
+    const data = await api("/api/ip");
+    if (data.ip) {
+      els.egress.textContent = `IP de sortie : ${data.ip}${data.proxy ? " (proxy)" : ""}`;
+    } else {
+      els.egress.textContent = data.proxy ? "IP : proxy injoignable" : "IP : —";
+    }
+  } catch {
+    els.egress.textContent = "";
   }
 }
 
@@ -297,6 +312,7 @@ els.scheduleBody.addEventListener("click", (e) => {
 
 // --- Init --------------------------------------------------------------------
 loadStatus();
+loadIp();
 loadHistory();
 loadSchedule();
 updateCharCount();

@@ -7,13 +7,14 @@ import {
   HEADLESS,
   HOST,
   PORT,
+  PROXY_ENABLED,
   PUBLIC_DIR,
   REMOTE_MODE,
   SCREENSHOTS_DIR,
 } from "./config.js";
 import { previewInput, replyInput, scheduleInput } from "./schemas.js";
 import { fetchPreview } from "./reddit/preview.js";
-import { getLoggedInUser } from "./reddit/browser.js";
+import { getEgressIp, getLoggedInUser } from "./reddit/browser.js";
 import { postReply } from "./reddit/poster.js";
 import {
   disposeSession,
@@ -65,6 +66,14 @@ app.get("/api/status", async () => {
   const context = await getContext();
   const user = await getLoggedInUser(context);
   return { loggedIn: user !== null, user, headless: HEADLESS, switching: false, remote: REMOTE_MODE };
+});
+
+/** IP de sortie réellement vue par les sites (diagnostic proxy). */
+app.get("/api/ip", async () => {
+  if (isSwitching()) return { ip: null, proxy: PROXY_ENABLED, switching: true };
+  const context = await getContext();
+  const ip = await getEgressIp(context);
+  return { ip, proxy: PROXY_ENABLED, switching: false };
 });
 
 /** Changement de compte : déconnexion + ouverture d'une fenêtre de login (local uniquement). */
