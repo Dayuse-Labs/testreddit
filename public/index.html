@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Réponses Reddit — outil interne</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Réponses Reddit</h1>
+      <div class="topbar-right">
+        <div id="status" class="status status--unknown">Vérification de la session…</div>
+        <button id="switchAccount" type="button" class="secondary small">Changer de compte</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>1. Cible</h2>
+        <label for="url">URL du post ou du commentaire Reddit</label>
+        <div class="row">
+          <input
+            id="url"
+            type="url"
+            placeholder="https://www.reddit.com/r/.../comments/..."
+            autocomplete="off"
+          />
+          <button id="loadPreview" type="button">Charger l'aperçu</button>
+        </div>
+        <div id="previewError" class="error" hidden></div>
+        <div id="preview" class="preview" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>2. Réponse</h2>
+        <label for="text">Texte de la réponse (relis l'orthographe avant d'envoyer)</label>
+        <textarea id="text" rows="8" placeholder="Votre réponse…"></textarea>
+        <div class="meta">
+          <span id="charCount">0 caractère</span>
+        </div>
+        <label class="checkbox">
+          <input id="reviewed" type="checkbox" />
+          J'ai relu l'orthographe et le contenu
+        </label>
+
+        <div class="actions">
+          <button id="publish" type="button" disabled>Publier maintenant</button>
+          <div class="schedule-inline">
+            <input id="sendAt" type="datetime-local" />
+            <button id="scheduleBtn" type="button" class="secondary" disabled>Programmer l'envoi</button>
+          </div>
+        </div>
+        <div id="result" class="result" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>Envois programmés</h2>
+        <button id="refreshSchedule" type="button" class="secondary">Rafraîchir</button>
+        <table id="schedule">
+          <thead>
+            <tr>
+              <th>Prévu pour</th>
+              <th>Type</th>
+              <th>Cible</th>
+              <th>Statut</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Historique</h2>
+        <button id="refreshHistory" type="button" class="secondary">Rafraîchir</button>
+        <table id="history">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Cible</th>
+              <th>Statut</th>
+              <th>Capture</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
