@@ -5,27 +5,9 @@ import {
   type Page,
 } from "playwright";
 import { mkdir } from "node:fs/promises";
-import {
-  BROWSER_USER_AGENT,
-  PROFILE_DIR,
-  PROXY_ENABLED,
-  PROXY_PASSWORD,
-  PROXY_SERVER,
-  PROXY_USERNAME,
-  REDDIT_SESSION_B64,
-  REMOTE_MODE,
-} from "../config.js";
-
-/** Option proxy Playwright si un proxy résidentiel est configuré. */
-const PROXY_OPTION = PROXY_ENABLED
-  ? {
-      proxy: {
-        server: PROXY_SERVER,
-        ...(PROXY_USERNAME ? { username: PROXY_USERNAME } : {}),
-        ...(PROXY_PASSWORD ? { password: PROXY_PASSWORD } : {}),
-      },
-    }
-  : {};
+import { BROWSER_USER_AGENT, PROFILE_DIR } from "../config.js";
+import { localAccount } from "./accounts.js";
+import type { Account } from "../schemas.js";
 
 const COMMON_OPTIONS = {
   viewport: { width: 1280, height: 900 },
@@ -33,25 +15,39 @@ const COMMON_OPTIONS = {
   locale: "fr-FR",
 } as const;
 
+/** Construit l'option proxy Playwright pour un compte donné, si défini. */
+function proxyOption(account: Account) {
+  if (!account.proxy?.server) return {};
+  return {
+    proxy: {
+      server: account.proxy.server,
+      ...(account.proxy.username ? { username: account.proxy.username } : {}),
+      ...(account.proxy.password ? { password: account.proxy.password } : {}),
+    },
+  };
+}
+
 /**
- * Lance le contexte Chromium selon le mode :
- *
- * - Mode serveur (REMOTE_MODE) : la session est injectée via la variable
- *   d'environnement REDDIT_SESSION_B64 (base64 d'un storageState Playwright).
- *   Aucun profil sur disque, aucune interface graphique requise — adapté à
- *   Railway/VPS.
- * - Mode local : profil persistant partagé entre le login manuel (headed) et
- *   la publication (headless).
+ * Lance un contexte Chromium pour un compte :
+ * - compte avec session injectée (sessionB64) → navigateur jetable + storageState
+ *   (mode serveur, sans interface graphique) ;
+ * - compte local (sessionB64 vide) → profil persistant sur disque (login manuel).
+ * Chaque compte utilise son propre proxy résidentiel.
  */
-export async function launchContext(headless: boolean): Promise<BrowserContext> {
-  if (REMOTE_MODE) {
+export async function launchContextForAccount(
+  account: Account,
+  headless: boolean,
+): Promise<BrowserContext> {
+  const proxy = proxyOption(account);
+
+  if (account.sessionB64) {
     const storageState = JSON.parse(
-      Buffer.from(REDDIT_SESSION_B64, "base64").toString("utf8"),
+      Buffer.from(account.sessionB64, "base64").toString("utf8"),
     ) as BrowserContextOptions["storageState"];
 
     const browser = await chromium.launch({
       headless: true,
-      ...PROXY_OPTION,
+      ...proxy,
       args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
     });
     return browser.newContext({ ...COMMON_OPTIONS, storageState });
@@ -61,9 +57,14 @@ export async function launchContext(headless: boolean): Promise<BrowserContext> 
   return chromium.launchPersistentContext(PROFILE_DIR, {
     headless,
     ...COMMON_OPTIONS,
-    ...PROXY_OPTION,
+    ...proxy,
     args: ["--disable-blink-features=AutomationControlled"],
   });
+}
+
+/** Lance le contexte du compte local (profil persistant). Utilisé par le login manuel. */
+export async function launchContext(headless: boolean): Promise<BrowserContext> {
+  return launchContextForAccount(localAccount(), headless);
 }
 
 /**

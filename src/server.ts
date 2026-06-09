@@ -6,10 +6,9 @@ import {
   APP_USER,
   HEADLESS,
   HOST,
+  LOCAL_MODE,
   PORT,
-  PROXY_ENABLED,
   PUBLIC_DIR,
-  REMOTE_MODE,
   SCREENSHOTS_DIR,
 } from "./config.js";
 import { previewInput, replyInput, scheduleInput } from "./schemas.js";
@@ -17,18 +16,18 @@ import { fetchPreview } from "./reddit/preview.js";
 import { getEgressIp, getLoggedInUser } from "./reddit/browser.js";
 import { postReply } from "./reddit/poster.js";
 import {
+  defaultAccountId,
+  getAccount,
+  publicAccounts,
+} from "./reddit/accounts.js";
+import {
   disposeSession,
-  getContext,
   isSwitching,
-  runExclusive,
   startAccountSwitch,
+  withAccount,
 } from "./reddit/session.js";
 import { appendHistory, readHistory, type HistoryEntry } from "./history/store.js";
-import {
-  addSchedule,
-  readSchedule,
-  removeSchedule,
-} from "./schedule/store.js";
+import { addSchedule, readSchedule, removeSchedule } from "./schedule/store.js";
 import { startScheduler } from "./schedule/scheduler.js";
 
 const app = Fastify({ logger: { transport: undefined } });
@@ -56,27 +55,61 @@ await app.register(fastifyStatic, {
   decorateReply: false,
 });
 
+// Renvoie un libellé pour un compte (pour journalisation).
+function accountLabel(id: string | undefined): string {
+  const resolved = id ?? defaultAccountId();
+  return getAccount(resolved)?.label ?? resolved;
+}
+
 // --- Routes API --------------------------------------------------------------
 
-/** État de la connexion Reddit. */
-app.get("/api/status", async () => {
+/** Liste des comptes configurés (sans secrets) + compte par défaut. */
+app.get("/api/accounts", async () => {
+  return { accounts: publicAccounts(), defaultId: defaultAccountId(), managed: !LOCAL_MODE };
+});
+
+/** État de la connexion Reddit pour un compte. */
+app.get<{ Querystring: { account?: string } }>("/api/status", async (request) => {
   if (isSwitching()) {
-    return { loggedIn: false, user: null, headless: HEADLESS, switching: true, remote: REMOTE_MODE };
+    return { loggedIn: false, user: null, headless: HEADLESS, switching: true, remote: !LOCAL_MODE };
   }
-  const context = await getContext();
-  const user = await getLoggedInUser(context);
-  return { loggedIn: user !== null, user, headless: HEADLESS, switching: false, remote: REMOTE_MODE };
+  const accountId = request.query.account ?? defaultAccountId();
+  try {
+    const user = await withAccount(accountId, (context) => getLoggedInUser(context));
+    return {
+      loggedIn: user !== null,
+      user,
+      accountId,
+      headless: HEADLESS,
+      switching: false,
+      remote: !LOCAL_MODE,
+    };
+  } catch (error) {
+    return {
+      loggedIn: false,
+      user: null,
+      accountId,
+      headless: HEADLESS,
+      switching: false,
+      remote: !LOCAL_MODE,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 });
 
-/** IP de sortie réellement vue par les sites (diagnostic proxy). */
-app.get("/api/ip", async () => {
-  if (isSwitching()) return { ip: null, proxy: PROXY_ENABLED, switching: true };
-  const context = await getContext();
-  const ip = await getEgressIp(context);
-  return { ip, proxy: PROXY_ENABLED, switching: false };
+/** IP de sortie réellement vue par les sites (diagnostic proxy) pour un compte. */
+app.get<{ Querystring: { account?: string } }>("/api/ip", async (request) => {
+  if (isSwitching()) return { ip: null, switching: true };
+  const accountId = request.query.account ?? defaultAccountId();
+  try {
+    const ip = await withAccount(accountId, (context) => getEgressIp(context));
+    return { ip, accountId, switching: false };
+  } catch (error) {
+    return { ip: null, accountId, switching: false, error: error instanceof Error ? error.message : String(error) };
+  }
 });
 
-/** Changement de compte : déconnexion + ouverture d'une fenêtre de login (local uniquement). */
+/** Re-login local (mode local uniquement). */
 app.post("/api/switch-account", async (_request, reply) => {
   try {
     await startAccountSwitch();
@@ -86,7 +119,7 @@ app.post("/api/switch-account", async (_request, reply) => {
   }
 });
 
-/** Aperçu du fil ciblé (via la session connectée). */
+/** Aperçu du fil ciblé (via la session du compte choisi). */
 app.post("/api/preview", async (request, reply) => {
   const parsed = previewInput.safeParse(request.body);
   if (!parsed.success) {
@@ -97,8 +130,9 @@ app.post("/api/preview", async (request, reply) => {
   }
 
   try {
-    const context = await getContext();
-    const preview = await fetchPreview(context, parsed.data.url);
+    const preview = await withAccount(parsed.data.accountId, (context) =>
+      fetchPreview(context, parsed.data.url),
+    );
     return preview;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -116,13 +150,12 @@ app.post("/api/reply", async (request, reply) => {
     return reply.code(409).send({ error: "Changement de compte en cours, réessaie dans un instant." });
   }
 
-  const { url, text } = parsed.data;
+  const { url, text, accountId } = parsed.data;
   const timestamp = new Date().toISOString();
 
-  const result = await runExclusive(async () => {
-    const context = await getContext();
-    return postReply(context, url, text, timestamp);
-  });
+  const result = await withAccount(accountId, (context) =>
+    postReply(context, url, text, timestamp),
+  );
 
   const entry: HistoryEntry = {
     id: timestamp,
@@ -132,6 +165,8 @@ app.post("/api/reply", async (request, reply) => {
     text,
     status: result.success ? "success" : "error",
     loggedInUser: result.loggedInUser,
+    accountId: accountId ?? defaultAccountId(),
+    accountLabel: accountLabel(accountId),
     ...(result.error ? { error: result.error } : {}),
     ...(result.screenshotFile ? { screenshotFile: result.screenshotFile } : {}),
   };
@@ -149,7 +184,10 @@ app.post("/api/schedule", async (request, reply) => {
   if (!parsed.success) {
     return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Entrée invalide" });
   }
-  const item = await addSchedule(parsed.data, new Date().toISOString());
+  const item = await addSchedule(
+    { ...parsed.data, accountLabel: accountLabel(parsed.data.accountId) },
+    new Date().toISOString(),
+  );
   return item;
 });
 

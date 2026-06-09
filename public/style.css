@@ -62,6 +62,17 @@ button.small {
   color: var(--muted);
 }
 
+.account-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+  max-width: 220px;
+}
+
 .status--ok {
   background: var(--ok-bg);
   color: var(--ok);

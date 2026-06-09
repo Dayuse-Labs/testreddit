@@ -5,6 +5,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   status: $("status"),
   egress: $("egress"),
+  accountSelect: $("accountSelect"),
   switchAccount: $("switchAccount"),
   url: $("url"),
   loadPreview: $("loadPreview"),
@@ -24,6 +25,12 @@ const els = {
 };
 
 let previewLoaded = false;
+let currentAccountId = null;
+
+/** Suffixe de requête pour cibler le compte actif. */
+function accountQuery() {
+  return currentAccountId ? `?account=${encodeURIComponent(currentAccountId)}` : "";
+}
 
 function escapeHtml(value) {
   const div = document.createElement("div");
@@ -40,12 +47,43 @@ async function api(path, options) {
   return data;
 }
 
+// --- Comptes -----------------------------------------------------------------
+async function loadAccounts() {
+  try {
+    const data = await api("/api/accounts");
+    const accounts = data.accounts || [];
+    currentAccountId = data.defaultId || (accounts[0] && accounts[0].id) || null;
+
+    if (accounts.length > 1) {
+      els.accountSelect.innerHTML = accounts
+        .map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.label)}</option>`)
+        .join("");
+      els.accountSelect.value = currentAccountId;
+      els.accountSelect.hidden = false;
+    } else {
+      els.accountSelect.hidden = true;
+    }
+    // Mode géré (comptes via config) → pas de re-login depuis l'UI.
+    els.switchAccount.hidden = Boolean(data.managed);
+  } catch {
+    els.accountSelect.hidden = true;
+  }
+}
+
+function onAccountChange() {
+  currentAccountId = els.accountSelect.value;
+  // Réinitialise l'aperçu (il dépend du compte) et rafraîchit statut/IP.
+  previewLoaded = false;
+  els.preview.hidden = true;
+  refreshActionState();
+  loadStatus();
+  loadIp();
+}
+
 // --- Statut de connexion -----------------------------------------------------
 async function loadStatus() {
   try {
-    const data = await api("/api/status");
-    // En mode serveur, le changement de compte se fait via la session injectée.
-    els.switchAccount.hidden = Boolean(data.remote);
+    const data = await api(`/api/status${accountQuery()}`);
     if (data.switching) {
       els.status.textContent = "Changement de compte… connecte-toi dans la fenêtre";
       els.status.className = "status status--unknown";
@@ -65,12 +103,8 @@ async function loadStatus() {
 async function loadIp() {
   els.egress.textContent = "IP : …";
   try {
-    const data = await api("/api/ip");
-    if (data.ip) {
-      els.egress.textContent = `IP de sortie : ${data.ip}${data.proxy ? " (proxy)" : ""}`;
-    } else {
-      els.egress.textContent = data.proxy ? "IP : proxy injoignable" : "IP : —";
-    }
+    const data = await api(`/api/ip${accountQuery()}`);
+    els.egress.textContent = data.ip ? `IP de sortie : ${data.ip}` : "IP : —";
   } catch {
     els.egress.textContent = "";
   }
@@ -114,7 +148,7 @@ async function loadPreview() {
     const p = await api("/api/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, accountId: currentAccountId }),
     });
 
     let html = `<h3>${escapeHtml(p.post.title)}</h3>`;
@@ -158,7 +192,7 @@ async function publish() {
     await api("/api/reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, text }),
+      body: JSON.stringify({ url, text, accountId: currentAccountId }),
     });
     showResult(true, "✅ Réponse publiée.");
     resetForm();
@@ -188,7 +222,7 @@ async function schedule() {
     await api("/api/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, text, sendAt }),
+      body: JSON.stringify({ url, text, sendAt, accountId: currentAccountId }),
     });
     showResult(true, `🕒 Envoi programmé pour le ${new Date(sendAt).toLocaleString("fr-FR")}.`);
     resetForm();
@@ -231,6 +265,7 @@ async function loadHistory() {
         const title = e.error ? ` title="${escapeHtml(e.error)}"` : "";
         return `<tr${title}>
           <td>${escapeHtml(date)}</td>
+          <td>${escapeHtml(e.accountLabel || "—")}</td>
           <td>${e.type === "comment" ? "commentaire" : "post"}</td>
           <td><a href="${escapeHtml(e.targetUrl)}" target="_blank">lien</a></td>
           <td>${badge}</td>
@@ -263,6 +298,7 @@ async function loadSchedule() {
         const title = item.error ? ` title="${escapeHtml(item.error)}"` : "";
         return `<tr${title}>
           <td>${escapeHtml(due)}</td>
+          <td>${escapeHtml(item.accountLabel || "—")}</td>
           <td>${item.type === "comment" ? "commentaire" : "post"}</td>
           <td><a href="${escapeHtml(target)}" target="_blank">lien</a></td>
           <td>${badge}</td>
@@ -290,6 +326,7 @@ function updateCharCount() {
 }
 
 // --- Évènements --------------------------------------------------------------
+els.accountSelect.addEventListener("change", onAccountChange);
 els.switchAccount.addEventListener("click", switchAccount);
 els.loadPreview.addEventListener("click", loadPreview);
 els.url.addEventListener("keydown", (e) => {
@@ -311,8 +348,11 @@ els.scheduleBody.addEventListener("click", (e) => {
 });
 
 // --- Init --------------------------------------------------------------------
-loadStatus();
-loadIp();
+// Charge d'abord les comptes (définit currentAccountId), puis le reste.
+loadAccounts().then(() => {
+  loadStatus();
+  loadIp();
+});
 loadHistory();
 loadSchedule();
 updateCharCount();

@@ -11,6 +11,8 @@ export type ScheduledItem = {
   sendAt: string;
   createdAt: string;
   status: "pending" | "sent" | "error";
+  accountId?: string;
+  accountLabel?: string;
   /** Renseignés après tentative d'envoi. */
   type?: "post" | "comment";
   targetUrl?: string;
@@ -40,7 +42,13 @@ export async function readSchedule(): Promise<ScheduledItem[]> {
 
 /** Ajoute un envoi programmé et renvoie l'entrée créée. */
 export async function addSchedule(
-  input: { url: string; text: string; sendAt: string },
+  input: {
+    url: string;
+    text: string;
+    sendAt: string;
+    accountId?: string;
+    accountLabel?: string;
+  },
   createdAt: string,
 ): Promise<ScheduledItem> {
   const items = await readSchedule();
@@ -51,6 +59,8 @@ export async function addSchedule(
     sendAt: input.sendAt,
     createdAt,
     status: "pending",
+    ...(input.accountId ? { accountId: input.accountId } : {}),
+    ...(input.accountLabel ? { accountLabel: input.accountLabel } : {}),
   };
   items.push(item);
   await writeAll(items);

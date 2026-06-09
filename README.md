@@ -67,6 +67,40 @@ Copie cette valeur : c'est ta session connectée.
 En mode serveur : le bouton « Changer de compte » disparaît (pour changer de compte,
 refais l'étape 1 et mets à jour `REDDIT_SESSION_B64`), et le planificateur tourne en 24/7.
 
+## Plusieurs comptes (un par marché)
+
+Chaque compte a sa **propre session** et son **propre proxy résidentiel** (idéalement géolocalisé sur son marché). En prod, un menu déroulant permet de choisir le compte actif.
+
+### Préparer les comptes (en local)
+
+Pour **chaque** compte, dans l'ordre :
+
+```bash
+# 1. Connecter le compte (efface la session précédente, ouvre une fenêtre)
+npm run switch
+
+# 2. L'enregistrer avec son proxy dédié (la session vient de l'étape 1)
+npm run add-account -- --label "France" \
+  --proxy-server http://gate.decodo.com:10003 \
+  --proxy-user user-martino99-country-fr-sessionduration-1440 \
+  --proxy-pass MOT_DE_PASSE_DECODO
+```
+
+Répète pour chaque marché (« Allemagne », « Espagne »…), chacun avec son `--proxy-user` géolocalisé (`country-de`, `country-es`…).
+
+```bash
+# 3. Assembler tous les comptes en une valeur
+npm run build-accounts
+```
+
+Ça écrit `data/ACCOUNTS_B64.txt`. Colle son contenu dans la variable **`ACCOUNTS_B64`** de Railway (remplace `REDDIT_SESSION_B64` / `PROXY_*`, qui ne servent plus quand `ACCOUNTS_B64` est défini).
+
+### En prod
+
+- Le menu déroulant en haut liste les comptes ; choisis-en un → l'IP de sortie et le statut se mettent à jour.
+- Aperçu, publication et programmation utilisent le **compte sélectionné**.
+- Les envois programmés mémorisent leur compte : le planificateur bascule sur le bon compte au moment de publier.
+
 ### Limites connues du mode serveur (à valider pendant la discovery)
 
 - **IP de datacenter** : Reddit peut bloquer (403) ou invalider la session utilisée depuis

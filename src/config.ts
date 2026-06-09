@@ -46,6 +46,23 @@ export const REDDIT_SESSION_B64 = process.env.REDDIT_SESSION_B64 ?? "";
 export const REMOTE_MODE = REDDIT_SESSION_B64.length > 0;
 
 /**
+ * Multi-comptes : base64 d'un tableau JSON de comptes (un par marché), chacun
+ * avec sa propre session et son propre proxy. Voir scripts/build-accounts.ts.
+ * Prioritaire sur REDDIT_SESSION_B64 (compte unique) quand présent.
+ */
+export const ACCOUNTS_B64 = process.env.ACCOUNTS_B64 ?? "";
+
+/**
+ * Mode local : ni multi-comptes ni session injectée → on utilise le profil
+ * persistant local (workflow de login manuel). Sinon, les comptes viennent de
+ * l'environnement (déploiement serveur) et le bouton de re-login est masqué.
+ */
+export const LOCAL_MODE = ACCOUNTS_B64.length === 0 && REDDIT_SESSION_B64.length === 0;
+
+/** Fichier local (gitignoré) listant les comptes en préparation pour build-accounts. */
+export const ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.local.json");
+
+/**
  * Protection optionnelle par Basic Auth. Si APP_PASSWORD est défini, toutes les
  * routes l'exigent (indispensable dès que l'outil est exposé sur Internet).
  */

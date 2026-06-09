@@ -1,5 +1,5 @@
 import { appendHistory, type HistoryEntry } from "../history/store.js";
-import { getContext, isSwitching, runExclusive } from "../reddit/session.js";
+import { isSwitching, withAccount } from "../reddit/session.js";
 import { postReply } from "../reddit/poster.js";
 import { readSchedule, updateSchedule } from "./store.js";
 
@@ -36,10 +36,9 @@ async function tick(log: (msg: string) => void): Promise<void> {
       const timestamp = new Date().toISOString();
       log(`Envoi programmé ${item.id} → publication`);
 
-      const result = await runExclusive(async () => {
-        const context = await getContext();
-        return postReply(context, item.url, item.text, timestamp);
-      });
+      const result = await withAccount(item.accountId, (context) =>
+        postReply(context, item.url, item.text, timestamp),
+      );
 
       await updateSchedule(item.id, {
         status: result.success ? "sent" : "error",
@@ -58,6 +57,8 @@ async function tick(log: (msg: string) => void): Promise<void> {
         text: item.text,
         status: result.success ? "success" : "error",
         loggedInUser: result.loggedInUser,
+        ...(item.accountId ? { accountId: item.accountId } : {}),
+        ...(item.accountLabel ? { accountLabel: item.accountLabel } : {}),
         ...(result.error ? { error: result.error } : {}),
         ...(result.screenshotFile ? { screenshotFile: result.screenshotFile } : {}),
       };

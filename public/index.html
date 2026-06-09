@@ -10,6 +10,7 @@
     <header class="topbar">
       <h1>Réponses Reddit</h1>
       <div class="topbar-right">
+        <select id="accountSelect" class="account-select" hidden></select>
         <span id="egress" class="egress"></span>
         <div id="status" class="status status--unknown">Vérification de la session…</div>
         <button id="switchAccount" type="button" class="secondary small">Changer de compte</button>
@@ -62,6 +63,7 @@
           <thead>
             <tr>
               <th>Prévu pour</th>
+              <th>Compte</th>
               <th>Type</th>
               <th>Cible</th>
               <th>Statut</th>
@@ -79,6 +81,7 @@
           <thead>
             <tr>
               <th>Date</th>
+              <th>Compte</th>
               <th>Type</th>
               <th>Cible</th>
               <th>Statut</th>

@@ -18,8 +18,27 @@ const redditUrl = z
     "L'URL doit pointer vers un post ou un commentaire (/comments/...)",
   );
 
+/** Identifiant de compte optionnel (défaut : premier compte configuré). */
+const accountId = z.string().trim().min(1).optional();
+
+export const proxyConfigSchema = z.object({
+  server: z.string().trim().min(1),
+  username: z.string().optional(),
+  password: z.string().optional(),
+});
+
+export const accountSchema = z.object({
+  id: z.string().trim().min(1),
+  label: z.string().trim().min(1),
+  sessionB64: z.string().min(1),
+  proxy: proxyConfigSchema.optional(),
+});
+
+export const accountsSchema = z.array(accountSchema);
+
 export const previewInput = z.object({
   url: redditUrl,
+  accountId,
 });
 
 export const replyInput = z.object({
@@ -29,6 +48,7 @@ export const replyInput = z.object({
     .trim()
     .min(1, "Le texte de la réponse est vide")
     .max(10000, "Le texte dépasse la limite de Reddit (10 000 caractères)"),
+  accountId,
 });
 
 export const scheduleInput = replyInput.extend({
@@ -42,6 +62,8 @@ export const scheduleInput = replyInput.extend({
     ),
 });
 
+export type Account = z.infer<typeof accountSchema>;
+export type ProxyConfig = z.infer<typeof proxyConfigSchema>;
 export type PreviewInput = z.infer<typeof previewInput>;
 export type ReplyInput = z.infer<typeof replyInput>;
 export type ScheduleInput = z.infer<typeof scheduleInput>;

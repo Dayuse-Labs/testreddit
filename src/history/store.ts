@@ -12,6 +12,8 @@ export type HistoryEntry = {
   error?: string;
   screenshotFile?: string;
   loggedInUser?: string | null;
+  accountId?: string;
+  accountLabel?: string;
 };
 
 /** Lit l'historique complet (plus récent en premier). Renvoie [] si absent. */
