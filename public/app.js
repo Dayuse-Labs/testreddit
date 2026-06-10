@@ -87,6 +87,10 @@ async function loadStatus() {
     if (data.switching) {
       els.status.textContent = "Changement de compte… connecte-toi dans la fenêtre";
       els.status.className = "status status--unknown";
+    } else if (data.pending && !data.loggedIn) {
+      els.status.textContent = "Connexion en cours…";
+      els.status.className = "status status--unknown";
+      els.status.title = "";
     } else if (data.loggedIn) {
       els.status.textContent = `Connecté : u/${data.user}`;
       els.status.className = "status status--ok";

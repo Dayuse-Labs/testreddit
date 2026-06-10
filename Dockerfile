@@ -15,4 +15,6 @@ ENV HOST=0.0.0.0
 ENV NODE_ENV=production
 
 # Railway fournit PORT automatiquement ; le serveur le lit.
-CMD ["npm", "run", "start"]
+# xvfb-run fournit un écran virtuel → permet le mode "headed" (HEADLESS=false),
+# moins détectable par l'anti-bot Reddit. Sans effet si HEADLESS=true.
+CMD ["xvfb-run", "-a", "npm", "run", "start"]

@@ -68,9 +68,10 @@ export function withAccount<T>(
   });
 }
 
-// Anti-tempête : ne retente pas un login auto plus d'une fois par compte / 20 s.
+// Anti-tempête / sécurité compte : un login auto au plus toutes les 10 min par
+// compte (évite de verrouiller le compte avec des tentatives répétées).
 const lastLoginAttempt = new Map<string, number>();
-const LOGIN_COOLDOWN_MS = 20_000;
+const LOGIN_COOLDOWN_MS = 10 * 60 * 1000;
 
 /**
  * Vérifie la connexion ; si déconnecté et que le compte a des identifiants,
@@ -111,6 +112,64 @@ export function withLoggedInAccount<T>(
     const login = await loginIfNeeded(ctx, id);
     return fn(ctx, login);
   });
+}
+
+// --- État de connexion en cache (statut non bloquant) -----------------------
+export type CachedState = {
+  loggedIn: boolean;
+  user: string | null;
+  error?: string;
+  pending: boolean;
+  checkedAt: number;
+};
+
+const stateById = new Map<string, CachedState>();
+const refreshing = new Set<string>();
+
+/** État de connexion en cache (réponse instantanée pour /api/status). */
+export function getCachedState(accountId: string): CachedState {
+  return (
+    stateById.get(accountId) ?? { loggedIn: false, user: null, pending: true, checkedAt: 0 }
+  );
+}
+
+/**
+ * Lance en arrière-plan (sans bloquer) une vérification + reconnexion auto du
+ * compte, et met à jour l'état en cache. Dédupliqué par compte.
+ */
+export function refreshLogin(accountId: string | undefined): void {
+  const id = accountId ?? defaultAccountId();
+  if (refreshing.has(id)) return;
+  refreshing.add(id);
+
+  const prev = stateById.get(id);
+  stateById.set(id, {
+    loggedIn: prev?.loggedIn ?? false,
+    user: prev?.user ?? null,
+    pending: true,
+    checkedAt: prev?.checkedAt ?? 0,
+  });
+
+  void withLoggedInAccount(id, async (_context, login) => login)
+    .then((login) => {
+      stateById.set(id, {
+        loggedIn: login.ok,
+        user: login.user ?? null,
+        pending: false,
+        checkedAt: Date.now(),
+        ...(login.ok ? {} : { error: login.error }),
+      });
+    })
+    .catch((error) => {
+      stateById.set(id, {
+        loggedIn: false,
+        user: null,
+        pending: false,
+        checkedAt: Date.now(),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    })
+    .finally(() => refreshing.delete(id));
 }
 
 export function getActiveAccountId(): string | null {

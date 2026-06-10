@@ -1,10 +1,24 @@
-import {
-  chromium,
-  type BrowserContext,
-  type BrowserContextOptions,
-  type Page,
-} from "playwright";
+import { chromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import type { BrowserContext, BrowserContextOptions, Page } from "playwright";
 import { mkdir } from "node:fs/promises";
+
+// Couche anti-détection : masque les signaux d'automatisation (navigator.webdriver,
+// headless, etc.) qui font bloquer le login par Reddit.
+chromium.use(StealthPlugin());
+
+/** Évasions complémentaires appliquées à chaque contexte (filet de sécurité). */
+async function applyStealth(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    // @ts-expect-error chrome n'existe pas dans les types DOM
+    window.chrome = window.chrome || { runtime: {} };
+    Object.defineProperty(navigator, "languages", {
+      get: () => ["fr-FR", "fr", "en-US", "en"],
+    });
+    Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+  });
+}
 import { BROWSER_USER_AGENT, PROFILE_DIR } from "../config.js";
 import { localAccount } from "./accounts.js";
 import type { Account } from "../schemas.js";
@@ -68,18 +82,21 @@ export async function launchContextForAccount(
   // Compte local : profil persistant sur disque (login manuel via fenêtre).
   if (account.local) {
     await mkdir(PROFILE_DIR, { recursive: true });
-    return chromium.launchPersistentContext(PROFILE_DIR, {
+    const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
       headless,
       ...COMMON_OPTIONS,
       ...proxy,
       args: ["--disable-blink-features=AutomationControlled"],
     });
+    await applyStealth(ctx);
+    return ctx;
   }
 
   // Compte géré : navigateur jetable. storageState si fourni (legacy), sinon
   // contexte vierge — la connexion se fera par identifiants (login-flow).
+  // headless suit la config (HEADLESS=false + xvfb sur Railway = moins détectable).
   const browser = await chromium.launch({
-    headless: true,
+    headless,
     ...proxy,
     args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
   });
@@ -90,7 +107,12 @@ export async function launchContextForAccount(
       ) as BrowserContextOptions["storageState"])
     : undefined;
 
-  return browser.newContext({ ...COMMON_OPTIONS, ...(storageState ? { storageState } : {}) });
+  const ctx = await browser.newContext({
+    ...COMMON_OPTIONS,
+    ...(storageState ? { storageState } : {}),
+  });
+  await applyStealth(ctx);
+  return ctx;
 }
 
 /** Lance le contexte du compte local (profil persistant). Utilisé par le login manuel. */

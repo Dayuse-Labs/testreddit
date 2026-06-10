@@ -23,7 +23,9 @@ import {
 } from "./reddit/accounts.js";
 import {
   disposeSession,
+  getCachedState,
   isSwitching,
+  refreshLogin,
   startAccountSwitch,
   withAccount,
   withLoggedInAccount,
@@ -76,30 +78,20 @@ app.get<{ Querystring: { account?: string } }>("/api/status", async (request) =>
     return { loggedIn: false, user: null, headless: HEADLESS, switching: true, remote: !LOCAL_MODE };
   }
   const accountId = request.query.account ?? defaultAccountId();
-  try {
-    // Vérifie la connexion et tente une reconnexion auto si déconnecté.
-    const login = await withLoggedInAccount(accountId, async (_context, result) => result);
-    return {
-      loggedIn: login.ok,
-      user: login.user ?? null,
-      accountId,
-      headless: HEADLESS,
-      switching: false,
-      remote: !LOCAL_MODE,
-      ...(login.ok ? {} : { loginError: login.error }),
-    };
-  } catch (error) {
-    app.log.error({ err: error }, "status: échec contexte/login");
-    return {
-      loggedIn: false,
-      user: null,
-      accountId,
-      headless: HEADLESS,
-      switching: false,
-      remote: !LOCAL_MODE,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+  // Réponse instantanée depuis le cache. On NE déclenche PAS de login ici
+  // (sécurité : évite une tempête de logins échoués qui pourrait verrouiller le
+  // compte). Le login a lieu au démarrage et lors des actions (aperçu/publier).
+  const cached = getCachedState(accountId);
+  return {
+    loggedIn: cached.loggedIn,
+    user: cached.user,
+    accountId,
+    headless: HEADLESS,
+    switching: false,
+    remote: !LOCAL_MODE,
+    pending: cached.pending,
+    ...(cached.error && !cached.loggedIn ? { loginError: cached.error } : {}),
+  };
 });
 
 /** IP de sortie réellement vue par les sites (diagnostic proxy) pour un compte. */
@@ -244,6 +236,8 @@ process.on("SIGTERM", shutdown);
 try {
   await app.listen({ host: HOST, port: PORT });
   startScheduler((msg) => app.log.info(msg));
+  // Connexion proactive du compte par défaut, en arrière-plan.
+  refreshLogin(defaultAccountId());
   app.log.info(`Outil de réponse Reddit : http://${HOST}:${PORT} (headless=${HEADLESS})`);
 } catch (error) {
   app.log.error(error);
