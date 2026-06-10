@@ -184,6 +184,10 @@ main {
   gap: 20px;
 }
 
+.tab-panel[hidden] {
+  display: none;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
