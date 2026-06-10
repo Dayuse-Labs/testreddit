@@ -325,6 +325,17 @@ function updateCharCount() {
   els.charCount.textContent = `${n} caractère${n > 1 ? "s" : ""}`;
 }
 
+// --- Onglets -----------------------------------------------------------------
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const target = tab.getAttribute("data-tab");
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t === tab));
+    document.querySelectorAll(".tab-panel").forEach((panel) => {
+      panel.hidden = panel.id !== `tab-${target}`;
+    });
+  });
+});
+
 // --- Évènements --------------------------------------------------------------
 els.accountSelect.addEventListener("change", onAccountChange);
 els.switchAccount.addEventListener("click", switchAccount);

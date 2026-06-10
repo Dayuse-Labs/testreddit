@@ -3,93 +3,219 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Réponses Reddit — outil interne</title>
+    <title>Réponses Reddit — Dayuse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <header class="topbar">
-      <h1>Réponses Reddit</h1>
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-name">Réponses Reddit</span>
+        <span class="brand-by">by Dayuse</span>
+      </div>
       <div class="topbar-right">
         <select id="accountSelect" class="account-select" hidden></select>
         <span id="egress" class="egress"></span>
-        <div id="status" class="status status--unknown">Vérification de la session…</div>
-        <button id="switchAccount" type="button" class="secondary small">Changer de compte</button>
+        <div id="status" class="status status--unknown">Vérification…</div>
+        <button id="switchAccount" type="button" class="btn btn-ghost btn-sm">Changer de compte</button>
       </div>
     </header>
 
+    <nav class="tabs">
+      <button class="tab is-active" data-tab="tool" type="button">Réponses</button>
+      <button class="tab" data-tab="doc" type="button">Documentation</button>
+    </nav>
+
     <main>
-      <section class="card">
-        <h2>1. Cible</h2>
-        <label for="url">URL du post ou du commentaire Reddit</label>
-        <div class="row">
-          <input
-            id="url"
-            type="url"
-            placeholder="https://www.reddit.com/r/.../comments/..."
-            autocomplete="off"
-          />
-          <button id="loadPreview" type="button">Charger l'aperçu</button>
-        </div>
-        <div id="previewError" class="error" hidden></div>
-        <div id="preview" class="preview" hidden></div>
-      </section>
-
-      <section class="card">
-        <h2>2. Réponse</h2>
-        <label for="text">Texte de la réponse (relis l'orthographe avant d'envoyer)</label>
-        <textarea id="text" rows="8" placeholder="Votre réponse…"></textarea>
-        <div class="meta">
-          <span id="charCount">0 caractère</span>
-        </div>
-        <label class="checkbox">
-          <input id="reviewed" type="checkbox" />
-          J'ai relu l'orthographe et le contenu
-        </label>
-
-        <div class="actions">
-          <button id="publish" type="button" disabled>Publier maintenant</button>
-          <div class="schedule-inline">
-            <input id="sendAt" type="datetime-local" />
-            <button id="scheduleBtn" type="button" class="secondary" disabled>Programmer l'envoi</button>
+      <!-- ============ ONGLET OUTIL ============ -->
+      <section id="tab-tool" class="tab-panel">
+        <div class="card">
+          <h2>1. Cible</h2>
+          <label for="url">URL du post ou du commentaire Reddit</label>
+          <div class="row">
+            <input
+              id="url"
+              type="url"
+              placeholder="https://www.reddit.com/r/.../comments/..."
+              autocomplete="off"
+            />
+            <button id="loadPreview" type="button" class="btn btn-primary">Charger l'aperçu</button>
           </div>
+          <div id="previewError" class="error" hidden></div>
+          <div id="preview" class="preview" hidden></div>
         </div>
-        <div id="result" class="result" hidden></div>
+
+        <div class="card">
+          <h2>2. Réponse</h2>
+          <label for="text">Texte de la réponse (relis l'orthographe avant d'envoyer)</label>
+          <textarea id="text" rows="8" placeholder="Votre réponse…"></textarea>
+          <div class="meta">
+            <span id="charCount">0 caractère</span>
+          </div>
+          <label class="checkbox">
+            <input id="reviewed" type="checkbox" />
+            J'ai relu l'orthographe et le contenu
+          </label>
+
+          <div class="actions">
+            <button id="publish" type="button" class="btn btn-primary" disabled>Publier maintenant</button>
+            <div class="schedule-inline">
+              <input id="sendAt" type="datetime-local" />
+              <button id="scheduleBtn" type="button" class="btn btn-ghost" disabled>Programmer l'envoi</button>
+            </div>
+          </div>
+          <div id="result" class="result" hidden></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Envois programmés</h2>
+            <button id="refreshSchedule" type="button" class="btn btn-ghost btn-sm">Rafraîchir</button>
+          </div>
+          <table id="schedule">
+            <thead>
+              <tr>
+                <th>Prévu pour</th>
+                <th>Compte</th>
+                <th>Type</th>
+                <th>Cible</th>
+                <th>Statut</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Historique</h2>
+            <button id="refreshHistory" type="button" class="btn btn-ghost btn-sm">Rafraîchir</button>
+          </div>
+          <table id="history">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Compte</th>
+                <th>Type</th>
+                <th>Cible</th>
+                <th>Statut</th>
+                <th>Capture</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
 
-      <section class="card">
-        <h2>Envois programmés</h2>
-        <button id="refreshSchedule" type="button" class="secondary">Rafraîchir</button>
-        <table id="schedule">
-          <thead>
-            <tr>
-              <th>Prévu pour</th>
-              <th>Compte</th>
-              <th>Type</th>
-              <th>Cible</th>
-              <th>Statut</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </section>
+      <!-- ============ ONGLET DOCUMENTATION ============ -->
+      <section id="tab-doc" class="tab-panel doc" hidden>
+        <div class="card">
+          <h2>À quoi sert cet outil</h2>
+          <p>
+            Cet outil permet de <strong>répondre à des posts et commentaires Reddit</strong> depuis
+            un ou plusieurs comptes d'entreprise, en relisant le contenu avant publication. Chaque
+            réponse est journalisée, et on peut programmer des envois à l'avance.
+          </p>
+          <ul>
+            <li><strong>Aperçu</strong> du fil ciblé pour vérifier le contexte et l'orthographe.</li>
+            <li><strong>Publication immédiate</strong> ou <strong>programmée</strong>.</li>
+            <li><strong>Plusieurs comptes</strong> (un par marché), chacun avec son IP résidentielle.</li>
+            <li><strong>Historique</strong> avec capture d'écran de chaque réponse.</li>
+          </ul>
+        </div>
 
-      <section class="card">
-        <h2>Historique</h2>
-        <button id="refreshHistory" type="button" class="secondary">Rafraîchir</button>
-        <table id="history">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Compte</th>
-              <th>Type</th>
-              <th>Cible</th>
-              <th>Statut</th>
-              <th>Capture</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="card">
+          <h2>Répondre à un post ou un commentaire</h2>
+          <ol>
+            <li>Colle l'<strong>URL d'un post</strong> (elle contient <code>/comments/...</code>) ou le
+              <strong>permalien d'un commentaire</strong> (bouton « Share » → « Copy link »).</li>
+            <li>Clique <strong>Charger l'aperçu</strong> pour vérifier le fil ciblé.</li>
+            <li>Écris ta réponse, relis, coche <strong>« J'ai relu »</strong>.</li>
+            <li><strong>Publier maintenant</strong>, ou choisis une date puis <strong>Programmer l'envoi</strong>.</li>
+          </ol>
+          <p class="note">
+            ⚠️ Une URL de subreddit seule (ex. <code>reddit.com/r/test/</code>) ne fonctionne pas :
+            il faut l'URL d'un <strong>post précis</strong>.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Choisir le compte (multi-marchés)</h2>
+          <p>
+            Quand plusieurs comptes sont configurés, un <strong>menu déroulant</strong> apparaît en
+            haut à droite. Le compte sélectionné est utilisé pour l'aperçu, la publication et la
+            programmation. L'<strong>IP de sortie</strong> affichée correspond au proxy résidentiel
+            de ce compte.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Ajouter un nouveau compte</h2>
+          <p>
+            Se connecter à Reddit nécessite un écran (mot de passe, parfois 2FA) : on prépare donc
+            chaque compte <strong>en local</strong>, puis on déploie. Pour chaque marché :
+          </p>
+          <pre><code>cd ~/Desktop/flat
+
+# 1. Connecter le compte (ouvre une fenêtre de login)
+npm run switch
+
+# 2. L'enregistrer avec son proxy résidentiel dédié
+npm run add-account -- --label "France" \
+  --proxy-server http://gate.decodo.com:10003 \
+  --proxy-user user-XXXX-country-fr-sessionduration-1440 \
+  --proxy-pass MOT_DE_PASSE_PROXY</code></pre>
+          <p>
+            Recommence pour chaque marché en adaptant le <strong>pays du proxy</strong>
+            (<code>country-fr</code>, <code>country-de</code>, <code>country-es</code>…). Puis assemble :
+          </p>
+          <pre><code># 3. Générer la configuration
+npm run build-accounts   # → écrit data/ACCOUNTS_B64.txt</code></pre>
+          <p>
+            Ouvre <code>data/ACCOUNTS_B64.txt</code>, copie son contenu et colle-le dans la variable
+            <strong><code>ACCOUNTS_B64</code></strong> de Railway. Redéploie : le compte apparaît
+            dans le menu déroulant.
+          </p>
+          <p class="note">
+            🔒 Ce contenu contient les sessions et identifiants proxy. Ne le partage jamais dans un
+            chat ou un message.
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Déploiement (Railway)</h2>
+          <p>Variables d'environnement à définir sur le service Railway :</p>
+          <table class="doc-table">
+            <thead><tr><th>Variable</th><th>Rôle</th></tr></thead>
+            <tbody>
+              <tr><td><code>ACCOUNTS_B64</code></td><td>Tous les comptes + proxys (via <code>build-accounts</code>). Prioritaire.</td></tr>
+              <tr><td><code>APP_PASSWORD</code></td><td>Mot de passe d'accès à l'interface (obligatoire).</td></tr>
+              <tr><td><code>APP_USER</code></td><td>Identifiant d'accès (défaut <code>admin</code>).</td></tr>
+            </tbody>
+          </table>
+          <p class="note">
+            Quand <code>ACCOUNTS_B64</code> est défini, il remplace <code>REDDIT_SESSION_B64</code>
+            et <code>PROXY_*</code> (compte unique). Sans volume Railway, l'historique et les envois
+            programmés se réinitialisent à chaque redéploiement (les comptes, eux, persistent).
+          </p>
+        </div>
+
+        <div class="card">
+          <h2>Bonnes pratiques & limites</h2>
+          <ul>
+            <li><strong>Géoloc par marché</strong> : un proxy du bon pays par compte réduit le risque de flag « nouvelle localisation ».</li>
+            <li><strong>IP stable</strong> : on utilise une session collante (sticky), pas une rotation à chaque requête — un compte qui saute d'IP est suspect.</li>
+            <li><strong>Volume faible & relu</strong> : chaque réponse est relue manuellement ; éviter le spam protège les comptes.</li>
+            <li><strong>Sessions</strong> : elles expirent — il faudra refaire <code>npm run switch</code> + <code>build-accounts</code> régulièrement.</li>
+          </ul>
+        </div>
       </section>
     </main>
 
