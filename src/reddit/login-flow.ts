@@ -6,7 +6,14 @@ import { SCREENSHOTS_DIR } from "../config.js";
 import { getLoggedInUser, getPage } from "./browser.js";
 import type { Credentials } from "../schemas.js";
 
-export type LoginResult = { ok: boolean; user?: string; error?: string; screenshotFile?: string };
+export type LoginResult = {
+  ok: boolean;
+  user?: string;
+  error?: string;
+  screenshotFile?: string;
+  /** true = échec lié à l'IP/au réseau → réessayer avec une autre IP peut marcher. */
+  retryable?: boolean;
+};
 
 // --- TOTP (RFC 6238, SHA1, 6 chiffres, pas de 30 s) --------------------------
 function base32Decode(input: string): Buffer {
@@ -61,9 +68,22 @@ export async function performLogin(
       waitUntil: "domcontentloaded",
       timeout: 45000,
     });
+    await page.waitForTimeout(3000);
+
+    // Blocage réseau (IP du proxy flaggée) → réessayable avec une autre IP.
+    const content = await page.content();
+    if (/blocked by network security|bloqué par.*sécurité/i.test(content)) {
+      return { ok: false, retryable: true, error: "IP bloquée par Reddit (network security)." };
+    }
 
     const userField = page.locator('input[name="username"]').first();
-    await userField.waitFor({ state: "visible", timeout: 20000 });
+    const formVisible = await userField
+      .waitFor({ state: "visible", timeout: 12000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!formVisible) {
+      return { ok: false, retryable: true, error: "Formulaire de login indisponible (IP/charge ?)." };
+    }
     await userField.fill(credentials.username);
     const passwordField = page.locator('input[name="password"]').first();
     await passwordField.fill(credentials.password);

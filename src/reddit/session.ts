@@ -68,19 +68,32 @@ export function withAccount<T>(
   });
 }
 
-// Anti-tempête / sécurité compte : un login auto au plus toutes les 10 min par
-// compte (évite de verrouiller le compte avec des tentatives répétées).
+/** Relance un contexte neuf pour le compte → nouvelle IP proxy (rotation). */
+async function relaunchContext(accountId: string): Promise<BrowserContext> {
+  const account = getAccount(accountId);
+  if (!account) throw new Error(`Compte inconnu : ${accountId}`);
+  await closeContext();
+  context = await launchContextForAccount(account, HEADLESS);
+  currentAccountId = accountId;
+  return context;
+}
+
+// Anti-tempête / sécurité compte : un cycle de login auto au plus toutes les
+// 10 min par compte (évite de verrouiller le compte). Les retours « IP bloquée »
+// ne soumettent PAS d'identifiants : on peut donc faire tourner l'IP sans risque.
 const lastLoginAttempt = new Map<string, number>();
 const LOGIN_COOLDOWN_MS = 10 * 60 * 1000;
+const MAX_LOGIN_ATTEMPTS = 4;
 
 /**
  * Vérifie la connexion ; si déconnecté et que le compte a des identifiants,
- * relance un login automatique (avec cooldown pour éviter les tempêtes).
+ * relance un login automatique. Réessaie avec une IP fraîche tant que l'échec
+ * est lié à l'IP (blocage « network security ») — sans re-soumettre le mot de
+ * passe. Opère sur le contexte courant du module (qu'il peut relancer).
  */
-async function loginIfNeeded(
-  context: BrowserContext,
-  accountId: string,
-): Promise<LoginResult> {
+async function loginIfNeeded(accountId: string): Promise<LoginResult> {
+  if (!context) throw new Error("Contexte non initialisé");
+
   const existing = await getLoggedInUser(context).catch(() => null);
   if (existing) return { ok: true, user: existing };
 
@@ -91,11 +104,17 @@ async function loginIfNeeded(
 
   const last = lastLoginAttempt.get(accountId) ?? 0;
   if (Date.now() - last < LOGIN_COOLDOWN_MS) {
-    return { ok: false, error: "Reconnexion en cours…" };
+    return { ok: false, error: "Reconnexion récente échouée — nouvelle tentative différée." };
   }
   lastLoginAttempt.set(accountId, Date.now());
 
-  return performLogin(context, account.credentials, Date.now() / 1000);
+  let result: LoginResult = { ok: false, error: "Échec de connexion." };
+  for (let attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
+    result = await performLogin(context, account.credentials, Date.now() / 1000);
+    if (result.ok || !result.retryable) return result; // succès, ou échec dur (CAPTCHA/identifiants)
+    if (attempt < MAX_LOGIN_ATTEMPTS) await relaunchContext(accountId); // IP bloquée → autre IP
+  }
+  return result;
 }
 
 /**
@@ -108,9 +127,10 @@ export function withLoggedInAccount<T>(
 ): Promise<T> {
   return runExclusive(async () => {
     const id = accountId ?? defaultAccountId();
-    const ctx = await ensureAccount(id);
-    const login = await loginIfNeeded(ctx, id);
-    return fn(ctx, login);
+    await ensureAccount(id);
+    const login = await loginIfNeeded(id);
+    if (!context) throw new Error("Contexte non initialisé");
+    return fn(context, login);
   });
 }
 

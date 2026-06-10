@@ -1,11 +1,21 @@
-import { chromium } from "playwright-extra";
+import { addExtra } from "playwright-extra";
+import { chromium as rebrowserChromium } from "rebrowser-playwright";
+import { chromium as basePlaywright } from "playwright";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { BrowserContext, BrowserContextOptions, Page } from "playwright";
 import { mkdir } from "node:fs/promises";
 
-// Couche anti-détection : masque les signaux d'automatisation (navigator.webdriver,
-// headless, etc.) qui font bloquer le login par Reddit.
+// Base = rebrowser-playwright : corrige la fuite CDP `Runtime.enable` que Reddit
+// (Cloudflare/DataDome) utilisent pour détecter l'automatisation — c'est ce qui
+// déclenchait le « An error occurred ». On lance le Chromium déjà installé par
+// playwright (executablePath) + le plugin stealth par-dessus.
+const chromium = addExtra(rebrowserChromium as unknown as Parameters<typeof addExtra>[0]);
 chromium.use(StealthPlugin());
+
+/** Chemin du Chromium installé par playwright (réutilisé par rebrowser). */
+function chromiumPath(): string {
+  return basePlaywright.executablePath();
+}
 
 /** Évasions complémentaires appliquées à chaque contexte (filet de sécurité). */
 async function applyStealth(context: BrowserContext): Promise<void> {
@@ -84,6 +94,7 @@ export async function launchContextForAccount(
     await mkdir(PROFILE_DIR, { recursive: true });
     const ctx = await chromium.launchPersistentContext(PROFILE_DIR, {
       headless,
+      executablePath: chromiumPath(),
       ...COMMON_OPTIONS,
       ...proxy,
       args: ["--disable-blink-features=AutomationControlled"],
@@ -97,6 +108,7 @@ export async function launchContextForAccount(
   // headless suit la config (HEADLESS=false + xvfb sur Railway = moins détectable).
   const browser = await chromium.launch({
     headless,
+    executablePath: chromiumPath(),
     ...proxy,
     args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
   });

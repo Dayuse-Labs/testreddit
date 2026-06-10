@@ -1,20 +1,22 @@
-# Image officielle Playwright : Chromium + dépendances système préinstallés.
-# La version doit rester alignée avec "playwright" dans package.json.
-FROM mcr.microsoft.com/playwright:v1.48.0-jammy
+# Base Node ; on installe Chromium + ses dépendances système alignés sur la
+# version de playwright résolue (évite les décalages de version d'image).
+FROM node:20-bookworm
 
 WORKDIR /app
 
-# Installe les dépendances (y compris devDependencies : tsx sert à lancer le TS).
 COPY package*.json ./
 RUN npm ci --include=dev
 
+# Chromium + libs système pour la version de playwright installée, et xvfb pour
+# le mode "headed" virtuel (HEADLESS=false), moins détectable par l'anti-bot.
+RUN npx playwright install --with-deps chromium \
+  && apt-get update && apt-get install -y --no-install-recommends xvfb \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY . .
 
-# Écoute sur toutes les interfaces (Railway route le trafic vers ce port).
 ENV HOST=0.0.0.0
 ENV NODE_ENV=production
 
-# Railway fournit PORT automatiquement ; le serveur le lit.
-# xvfb-run fournit un écran virtuel → permet le mode "headed" (HEADLESS=false),
-# moins détectable par l'anti-bot Reddit. Sans effet si HEADLESS=true.
+# xvfb-run fournit un écran virtuel (sans effet si HEADLESS=true).
 CMD ["xvfb-run", "-a", "npm", "run", "start"]
