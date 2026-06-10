@@ -89,6 +89,7 @@ app.get<{ Querystring: { account?: string } }>("/api/status", async (request) =>
       ...(login.ok ? {} : { loginError: login.error }),
     };
   } catch (error) {
+    app.log.error({ err: error }, "status: échec contexte/login");
     return {
       loggedIn: false,
       user: null,
@@ -109,6 +110,7 @@ app.get<{ Querystring: { account?: string } }>("/api/ip", async (request) => {
     const ip = await withAccount(accountId, (context) => getEgressIp(context));
     return { ip, accountId, switching: false };
   } catch (error) {
+    app.log.error({ err: error }, "ip: échec contexte/proxy");
     return { ip: null, accountId, switching: false, error: error instanceof Error ? error.message : String(error) };
   }
 });

@@ -92,10 +92,11 @@ async function loadStatus() {
       els.status.className = "status status--ok";
       els.status.title = "";
     } else {
-      els.status.textContent = "Non connecté";
+      // Affiche la raison directement (plus besoin de survoler).
+      const reason = (data.loginError || data.error || "").split("\n")[0];
+      els.status.textContent = reason ? `Non connecté — ${reason.slice(0, 80)}` : "Non connecté";
       els.status.className = "status status--err";
-      // Détail de l'échec de reconnexion auto (CAPTCHA / 2FA / identifiants) en infobulle.
-      els.status.title = data.loginError ? String(data.loginError).split("\n")[0] : "";
+      els.status.title = data.loginError || data.error || "";
     }
   } catch {
     els.status.textContent = "Statut indisponible";
@@ -108,6 +109,7 @@ async function loadIp() {
   try {
     const data = await api(`/api/ip${accountQuery()}`);
     els.egress.textContent = data.ip ? `IP de sortie : ${data.ip}` : "IP : —";
+    els.egress.title = data.ip ? "" : data.error || "";
   } catch {
     els.egress.textContent = "";
   }
