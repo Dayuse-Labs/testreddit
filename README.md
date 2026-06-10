@@ -71,27 +71,31 @@ refais l'étape 1 et mets à jour `REDDIT_SESSION_B64`), et le planificateur tou
 
 Chaque compte a sa **propre session** et son **propre proxy résidentiel** (idéalement géolocalisé sur son marché). En prod, un menu déroulant permet de choisir le compte actif.
 
+### Reconnexion automatique
+
+L'outil stocke les **identifiants** de chaque compte et **se reconnecte tout seul** quand la session Reddit tombe (plus de cookie à régénérer). La **2FA par application** est gérée via un secret TOTP ; la **2FA par SMS** doit être désactivée ; un **CAPTCHA** au login peut bloquer la reconnexion (le proxy résidentiel réduit ce risque).
+
 ### Préparer les comptes (en local)
 
-Pour **chaque** compte, dans l'ordre :
+Pour **chaque** marché :
 
 ```bash
-# 1. Connecter le compte (efface la session précédente, ouvre une fenêtre)
-npm run switch
-
-# 2. L'enregistrer avec son proxy dédié (la session vient de l'étape 1)
+# 1. Enregistrer le compte : identifiants + proxy résidentiel géolocalisé
 npm run add-account -- --label "France" \
+  --user PSEUDO_REDDIT --pass MOT_DE_PASSE [--totp SECRET_2FA] \
   --proxy-server http://gate.decodo.com:10003 \
-  --proxy-user user-martino99-country-fr-sessionduration-1440 \
+  --proxy-user user-martino99-country-fr-session-fr1-sessionduration-1440 \
   --proxy-pass MOT_DE_PASSE_DECODO
 ```
 
-Répète pour chaque marché (« Allemagne », « Espagne »…), chacun avec son `--proxy-user` géolocalisé (`country-de`, `country-es`…).
+Répète pour chaque marché, chacun avec son `--proxy-user` géolocalisé (`country-de`, `country-es`…) et un **jeton de session** unique (`session-fr1`, `session-de1`…) pour une IP stable.
 
 ```bash
-# 3. Assembler tous les comptes en une valeur
+# 2. Assembler tous les comptes en une valeur
 npm run build-accounts
 ```
+
+> Pour un **compte unique**, tu peux aussi définir `REDDIT_USERNAME` / `REDDIT_PASSWORD` (+ `REDDIT_TOTP_SECRET`) en variables d'environnement au lieu d'`ACCOUNTS_B64`.
 
 Ça écrit `data/ACCOUNTS_B64.txt`. Colle son contenu dans la variable **`ACCOUNTS_B64`** de Railway (remplace `REDDIT_SESSION_B64` / `PROXY_*`, qui ne servent plus quand `ACCOUNTS_B64` est défini).
 

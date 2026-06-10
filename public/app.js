@@ -90,9 +90,12 @@ async function loadStatus() {
     } else if (data.loggedIn) {
       els.status.textContent = `Connecté : u/${data.user}`;
       els.status.className = "status status--ok";
+      els.status.title = "";
     } else {
       els.status.textContent = "Non connecté";
       els.status.className = "status status--err";
+      // Détail de l'échec de reconnexion auto (CAPTCHA / 2FA / identifiants) en infobulle.
+      els.status.title = data.loginError ? String(data.loginError).split("\n")[0] : "";
     }
   } catch {
     els.status.textContent = "Statut indisponible";

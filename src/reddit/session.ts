@@ -3,6 +3,7 @@ import type { BrowserContext } from "playwright";
 import { HEADLESS, LOCAL_MODE, PROFILE_DIR } from "../config.js";
 import { getLoggedInUser, getPage, launchContext, launchContextForAccount } from "./browser.js";
 import { defaultAccountId, getAccount } from "./accounts.js";
+import { performLogin, type LoginResult } from "./login-flow.js";
 
 /**
  * Gère un unique contexte Chromium actif, identifié par compte. Les opérations
@@ -64,6 +65,51 @@ export function withAccount<T>(
   return runExclusive(async () => {
     const ctx = await ensureAccount(accountId ?? defaultAccountId());
     return fn(ctx);
+  });
+}
+
+// Anti-tempête : ne retente pas un login auto plus d'une fois par compte / 20 s.
+const lastLoginAttempt = new Map<string, number>();
+const LOGIN_COOLDOWN_MS = 20_000;
+
+/**
+ * Vérifie la connexion ; si déconnecté et que le compte a des identifiants,
+ * relance un login automatique (avec cooldown pour éviter les tempêtes).
+ */
+async function loginIfNeeded(
+  context: BrowserContext,
+  accountId: string,
+): Promise<LoginResult> {
+  const existing = await getLoggedInUser(context).catch(() => null);
+  if (existing) return { ok: true, user: existing };
+
+  const account = getAccount(accountId);
+  if (!account?.credentials) {
+    return { ok: false, error: "Compte déconnecté (pas d'identifiants pour reconnexion auto)." };
+  }
+
+  const last = lastLoginAttempt.get(accountId) ?? 0;
+  if (Date.now() - last < LOGIN_COOLDOWN_MS) {
+    return { ok: false, error: "Reconnexion en cours…" };
+  }
+  lastLoginAttempt.set(accountId, Date.now());
+
+  return performLogin(context, account.credentials, Date.now() / 1000);
+}
+
+/**
+ * Exécute `fn` avec le contexte du compte, en s'assurant d'abord qu'il est
+ * connecté (reconnexion auto par identifiants si besoin). Tout est sérialisé.
+ */
+export function withLoggedInAccount<T>(
+  accountId: string | undefined,
+  fn: (context: BrowserContext, login: LoginResult) => Promise<T>,
+): Promise<T> {
+  return runExclusive(async () => {
+    const id = accountId ?? defaultAccountId();
+    const ctx = await ensureAccount(id);
+    const login = await loginIfNeeded(ctx, id);
+    return fn(ctx, login);
   });
 }
 

@@ -1,6 +1,7 @@
 import { appendHistory, type HistoryEntry } from "../history/store.js";
-import { isSwitching, withAccount } from "../reddit/session.js";
+import { isSwitching, withLoggedInAccount } from "../reddit/session.js";
 import { postReply } from "../reddit/poster.js";
+import { parseRedditUrl } from "../reddit/url.js";
 import { readSchedule, updateSchedule } from "./store.js";
 
 /** Intervalle de vérification de la file (ms). */
@@ -36,9 +37,17 @@ async function tick(log: (msg: string) => void): Promise<void> {
       const timestamp = new Date().toISOString();
       log(`Envoi programmé ${item.id} → publication`);
 
-      const result = await withAccount(item.accountId, (context) =>
-        postReply(context, item.url, item.text, timestamp),
-      );
+      const result = await withLoggedInAccount(item.accountId, async (context, login) => {
+        if (!login.ok) {
+          return {
+            success: false as const,
+            target: parseRedditUrl(item.url),
+            loggedInUser: null,
+            error: login.error ?? "Compte non connecté",
+          };
+        }
+        return postReply(context, item.url, item.text, timestamp);
+      });
 
       await updateSchedule(item.id, {
         status: result.success ? "sent" : "error",

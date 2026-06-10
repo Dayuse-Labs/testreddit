@@ -1,13 +1,22 @@
 import {
   ACCOUNTS_B64,
+  HAS_ENV_CREDENTIALS,
   PROXY_ENABLED,
   PROXY_PASSWORD,
   PROXY_SERVER,
   PROXY_USERNAME,
+  REDDIT_PASSWORD,
   REDDIT_SESSION_B64,
+  REDDIT_TOTP_SECRET,
+  REDDIT_USERNAME,
   REMOTE_MODE,
 } from "../config.js";
-import { accountsSchema, type Account, type ProxyConfig } from "../schemas.js";
+import {
+  accountsSchema,
+  type Account,
+  type Credentials,
+  type ProxyConfig,
+} from "../schemas.js";
 
 function envProxy(): ProxyConfig | undefined {
   if (!PROXY_ENABLED) return undefined;
@@ -18,10 +27,19 @@ function envProxy(): ProxyConfig | undefined {
   };
 }
 
-/** Compte local (profil persistant + proxy d'environnement). sessionB64 vide = profil sur disque. */
+function envCredentials(): Credentials | undefined {
+  if (!HAS_ENV_CREDENTIALS) return undefined;
+  return {
+    username: REDDIT_USERNAME,
+    password: REDDIT_PASSWORD,
+    ...(REDDIT_TOTP_SECRET ? { totpSecret: REDDIT_TOTP_SECRET } : {}),
+  };
+}
+
+/** Compte local (profil persistant + login manuel). */
 export function localAccount(): Account {
   const proxy = envProxy();
-  return { id: "local", label: "Compte local", sessionB64: "", ...(proxy ? { proxy } : {}) };
+  return { id: "local", label: "Compte local", local: true, ...(proxy ? { proxy } : {}) };
 }
 
 let cached: Account[] | null = null;
@@ -42,13 +60,15 @@ export function getAccounts(): Account[] {
       throw new Error("ACCOUNTS_B64 invalide : " + (parsed.success ? "liste vide" : parsed.error.message));
     }
     cached = parsed.data;
-  } else if (REMOTE_MODE) {
+  } else if (REMOTE_MODE || HAS_ENV_CREDENTIALS) {
     const proxy = envProxy();
+    const credentials = envCredentials();
     cached = [
       {
         id: "default",
         label: "Compte par défaut",
-        sessionB64: REDDIT_SESSION_B64,
+        ...(REDDIT_SESSION_B64 ? { sessionB64: REDDIT_SESSION_B64 } : {}),
+        ...(credentials ? { credentials } : {}),
         ...(proxy ? { proxy } : {}),
       },
     ];

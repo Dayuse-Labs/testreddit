@@ -46,6 +46,15 @@ export const REDDIT_SESSION_B64 = process.env.REDDIT_SESSION_B64 ?? "";
 export const REMOTE_MODE = REDDIT_SESSION_B64.length > 0;
 
 /**
+ * Identifiants pour la reconnexion automatique du compte par défaut (compte
+ * unique). Pour le multi-comptes, les identifiants sont dans ACCOUNTS_B64.
+ */
+export const REDDIT_USERNAME = process.env.REDDIT_USERNAME ?? "";
+export const REDDIT_PASSWORD = process.env.REDDIT_PASSWORD ?? "";
+export const REDDIT_TOTP_SECRET = process.env.REDDIT_TOTP_SECRET ?? "";
+export const HAS_ENV_CREDENTIALS = REDDIT_USERNAME.length > 0 && REDDIT_PASSWORD.length > 0;
+
+/**
  * Multi-comptes : base64 d'un tableau JSON de comptes (un par marché), chacun
  * avec sa propre session et son propre proxy. Voir scripts/build-accounts.ts.
  * Prioritaire sur REDDIT_SESSION_B64 (compte unique) quand présent.
@@ -57,7 +66,8 @@ export const ACCOUNTS_B64 = process.env.ACCOUNTS_B64 ?? "";
  * persistant local (workflow de login manuel). Sinon, les comptes viennent de
  * l'environnement (déploiement serveur) et le bouton de re-login est masqué.
  */
-export const LOCAL_MODE = ACCOUNTS_B64.length === 0 && REDDIT_SESSION_B64.length === 0;
+export const LOCAL_MODE =
+  ACCOUNTS_B64.length === 0 && REDDIT_SESSION_B64.length === 0 && !HAS_ENV_CREDENTIALS;
 
 /** Fichier local (gitignoré) listant les comptes en préparation pour build-accounts. */
 export const ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.local.json");

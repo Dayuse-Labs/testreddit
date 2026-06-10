@@ -157,34 +157,43 @@
         </div>
 
         <div class="card">
-          <h2>Ajouter un nouveau compte</h2>
+          <h2>Reconnexion automatique</h2>
           <p>
-            Se connecter à Reddit nécessite un écran (mot de passe, parfois 2FA) : on prépare donc
-            chaque compte <strong>en local</strong>, puis on déploie. Pour chaque marché :
+            L'outil stocke les <strong>identifiants</strong> de chaque compte et <strong>se
+            reconnecte tout seul</strong> dès que la session Reddit tombe — plus besoin de
+            re-générer une session à la main. Limites : la <strong>2FA par application</strong> est
+            gérée si tu fournis le secret TOTP ; la <strong>2FA par SMS</strong> doit être désactivée,
+            et un éventuel <strong>CAPTCHA</strong> au login bloque la reconnexion auto (le proxy
+            résidentiel réduit fortement ce risque).
           </p>
+        </div>
+
+        <div class="card">
+          <h2>Ajouter un nouveau compte</h2>
+          <p>Pour chaque marché, enregistre le compte avec ses identifiants et son proxy dédié :</p>
           <pre><code>cd ~/Desktop/flat
 
-# 1. Connecter le compte (ouvre une fenêtre de login)
-npm run switch
-
-# 2. L'enregistrer avec son proxy résidentiel dédié
+# 1. Enregistrer le compte (identifiants + proxy géolocalisé)
 npm run add-account -- --label "France" \
+  --user PSEUDO_REDDIT --pass MOT_DE_PASSE [--totp SECRET_2FA] \
   --proxy-server http://gate.decodo.com:10003 \
-  --proxy-user user-XXXX-country-fr-sessionduration-1440 \
-  --proxy-pass MOT_DE_PASSE_PROXY</code></pre>
+  --proxy-user user-XXXX-country-fr-session-fr1-sessionduration-1440 \
+  --proxy-pass MOT_DE_PASSE_PROXY
+
+# 2. Générer la configuration
+npm run build-accounts   # → écrit data/ACCOUNTS_B64.txt</code></pre>
           <p>
             Recommence pour chaque marché en adaptant le <strong>pays du proxy</strong>
-            (<code>country-fr</code>, <code>country-de</code>, <code>country-es</code>…). Puis assemble :
+            (<code>country-fr</code>, <code>country-de</code>…) et un <strong>jeton de session</strong>
+            unique (<code>session-fr1</code>, <code>session-de1</code>…) pour une IP stable.
           </p>
-          <pre><code># 3. Générer la configuration
-npm run build-accounts   # → écrit data/ACCOUNTS_B64.txt</code></pre>
           <p>
             Ouvre <code>data/ACCOUNTS_B64.txt</code>, copie son contenu et colle-le dans la variable
             <strong><code>ACCOUNTS_B64</code></strong> de Railway. Redéploie : le compte apparaît
             dans le menu déroulant.
           </p>
           <p class="note">
-            🔒 Ce contenu contient les sessions et identifiants proxy. Ne le partage jamais dans un
+            🔒 Ce contenu contient les identifiants Reddit et proxy. Ne le partage jamais dans un
             chat ou un message.
           </p>
         </div>

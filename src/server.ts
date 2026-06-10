@@ -13,8 +13,9 @@ import {
 } from "./config.js";
 import { previewInput, replyInput, scheduleInput } from "./schemas.js";
 import { fetchPreview } from "./reddit/preview.js";
-import { getEgressIp, getLoggedInUser } from "./reddit/browser.js";
+import { getEgressIp } from "./reddit/browser.js";
 import { postReply } from "./reddit/poster.js";
+import { parseRedditUrl } from "./reddit/url.js";
 import {
   defaultAccountId,
   getAccount,
@@ -25,6 +26,7 @@ import {
   isSwitching,
   startAccountSwitch,
   withAccount,
+  withLoggedInAccount,
 } from "./reddit/session.js";
 import { appendHistory, readHistory, type HistoryEntry } from "./history/store.js";
 import { addSchedule, readSchedule, removeSchedule } from "./schedule/store.js";
@@ -75,14 +77,16 @@ app.get<{ Querystring: { account?: string } }>("/api/status", async (request) =>
   }
   const accountId = request.query.account ?? defaultAccountId();
   try {
-    const user = await withAccount(accountId, (context) => getLoggedInUser(context));
+    // Vérifie la connexion et tente une reconnexion auto si déconnecté.
+    const login = await withLoggedInAccount(accountId, async (_context, result) => result);
     return {
-      loggedIn: user !== null,
-      user,
+      loggedIn: login.ok,
+      user: login.user ?? null,
       accountId,
       headless: HEADLESS,
       switching: false,
       remote: !LOCAL_MODE,
+      ...(login.ok ? {} : { loginError: login.error }),
     };
   } catch (error) {
     return {
@@ -130,9 +134,10 @@ app.post("/api/preview", async (request, reply) => {
   }
 
   try {
-    const preview = await withAccount(parsed.data.accountId, (context) =>
-      fetchPreview(context, parsed.data.url),
-    );
+    const preview = await withLoggedInAccount(parsed.data.accountId, async (context, login) => {
+      if (!login.ok) throw new Error(login.error ?? "Compte non connecté");
+      return fetchPreview(context, parsed.data.url);
+    });
     return preview;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -153,9 +158,18 @@ app.post("/api/reply", async (request, reply) => {
   const { url, text, accountId } = parsed.data;
   const timestamp = new Date().toISOString();
 
-  const result = await withAccount(accountId, (context) =>
-    postReply(context, url, text, timestamp),
-  );
+  const result = await withLoggedInAccount(accountId, async (context, login) => {
+    if (!login.ok) {
+      return {
+        success: false as const,
+        target: parseRedditUrl(url),
+        loggedInUser: null,
+        error: login.error ?? "Compte non connecté",
+        ...(login.screenshotFile ? { screenshotFile: login.screenshotFile } : {}),
+      };
+    }
+    return postReply(context, url, text, timestamp);
+  });
 
   const entry: HistoryEntry = {
     id: timestamp,

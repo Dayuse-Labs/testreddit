@@ -40,26 +40,32 @@ export async function launchContextForAccount(
 ): Promise<BrowserContext> {
   const proxy = proxyOption(account);
 
-  if (account.sessionB64) {
-    const storageState = JSON.parse(
-      Buffer.from(account.sessionB64, "base64").toString("utf8"),
-    ) as BrowserContextOptions["storageState"];
-
-    const browser = await chromium.launch({
-      headless: true,
+  // Compte local : profil persistant sur disque (login manuel via fenêtre).
+  if (account.local) {
+    await mkdir(PROFILE_DIR, { recursive: true });
+    return chromium.launchPersistentContext(PROFILE_DIR, {
+      headless,
+      ...COMMON_OPTIONS,
       ...proxy,
-      args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+      args: ["--disable-blink-features=AutomationControlled"],
     });
-    return browser.newContext({ ...COMMON_OPTIONS, storageState });
   }
 
-  await mkdir(PROFILE_DIR, { recursive: true });
-  return chromium.launchPersistentContext(PROFILE_DIR, {
-    headless,
-    ...COMMON_OPTIONS,
+  // Compte géré : navigateur jetable. storageState si fourni (legacy), sinon
+  // contexte vierge — la connexion se fera par identifiants (login-flow).
+  const browser = await chromium.launch({
+    headless: true,
     ...proxy,
-    args: ["--disable-blink-features=AutomationControlled"],
+    args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
   });
+
+  const storageState = account.sessionB64
+    ? (JSON.parse(
+        Buffer.from(account.sessionB64, "base64").toString("utf8"),
+      ) as BrowserContextOptions["storageState"])
+    : undefined;
+
+  return browser.newContext({ ...COMMON_OPTIONS, ...(storageState ? { storageState } : {}) });
 }
 
 /** Lance le contexte du compte local (profil persistant). Utilisé par le login manuel. */
