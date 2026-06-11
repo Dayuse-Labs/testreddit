@@ -248,24 +248,23 @@ export async function startManualLogin(accountId: string): Promise<void> {
   const account = getAccount(id);
   if (!account) throw new Error(`Compte inconnu : ${id}`);
 
+  // NB : ne bloque PAS l'outil (pas de flag « switching ») — l'humain prend son temps.
   await runExclusive(async () => {
-    switching = true;
     await closeContext();
     try {
       context = await launchContextForAccount(account, false); // fenêtre visible
       currentAccountId = id;
       const page = await getPage(context);
       await page.bringToFront().catch(() => undefined);
+      // URL de login « propre » (sans paramètres, qui peuvent déclencher un blocage).
       await page
-        .goto("https://www.reddit.com/login/", { waitUntil: "domcontentloaded" })
+        .goto("https://www.reddit.com/login/", { waitUntil: "domcontentloaded", referer: "https://www.reddit.com/" })
         .catch(() => undefined);
       await page.bringToFront().catch(() => undefined);
       logLine(`Connexion manuelle « ${account.label} » : fenêtre ouverte, connecte-toi.`);
     } catch (error) {
-      switching = false;
       throw new Error(
-        "Impossible d'ouvrir une fenêtre — l'outil tourne en mode serveur (headless). " +
-          "La connexion manuelle nécessite de lancer l'outil en local (npm run dev sur ta machine).",
+        "Impossible d'ouvrir une fenêtre — l'outil tourne en mode serveur sans écran virtuel (ENABLE_VNC ?).",
       );
     }
   });
@@ -274,20 +273,16 @@ export async function startManualLogin(accountId: string): Promise<void> {
 }
 
 async function waitForManualLogin(accountId: string): Promise<void> {
-  const deadline = Date.now() + 5 * 60 * 1000;
-  try {
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      const current = context;
-      if (!current) break;
-      const user = await getLoggedInUser(current).catch(() => null);
-      if (user) {
-        logLine(`Connexion manuelle réussie : u/${user} (compte ${accountId}).`);
-        break;
-      }
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const current = context;
+    if (!current || currentAccountId !== accountId) break;
+    const user = await getLoggedInUser(current).catch(() => null);
+    if (user) {
+      logLine(`Connexion manuelle réussie : u/${user} (compte ${accountId}).`);
+      break;
     }
-  } finally {
-    switching = false;
   }
 }
 
