@@ -92,9 +92,10 @@ export const draftReplyInput = z.object({
   title: z.string().trim().min(1),
   subreddit: z.string().trim().min(1),
   body: z.string().optional(),
+  comments: z
+    .array(z.object({ author: z.string(), body: z.string(), score: z.number() }))
+    .optional(),
   targetComment: z.string().optional(),
-  tone: z.string().optional(),
-  length: z.string().optional(),
   guidance: z.string().optional(),
 });
 

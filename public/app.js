@@ -143,22 +143,27 @@ document.querySelectorAll(".seg").forEach((seg) => {
   });
 });
 
-async function loadReco() {
+async function loadReco(force) {
   $("loadReco").disabled = true;
-  $("recoStatus").textContent = "Analyse Reddit en cours… (~20-40 s)";
+  $("refreshReco").disabled = true;
+  $("recoStatus").textContent = force
+    ? "Re-scan de Reddit en cours… (~20-40 s)"
+    : "Chargement…";
   $("recoList").innerHTML = "";
   try {
     const sep = accountQuery() ? "&" : "?";
-    const data = await api(`/api/recommendations${accountQuery()}${sep}stream=${currentStream}`);
+    const data = await api(`/api/recommendations${accountQuery()}${sep}stream=${currentStream}${force ? "&refresh=1" : ""}`);
     const recos = data.recommendations || [];
+    const when = data.generatedAt ? new Date(data.generatedAt).toLocaleString("fr-FR") : "";
     $("recoStatus").textContent = recos.length
-      ? `${recos.length} threads recommandés.`
-      : "Aucun thread ne correspond pour l'instant — réessaie plus tard.";
+      ? `${recos.length} threads · généré le ${when}${data.cached ? " (cache)" : ""}`
+      : "Aucun thread ne correspond — clique « Actualiser » (nécessite une session connectée pour le flux Dayuse).";
     $("recoList").innerHTML = recos.map(recoCard).join("");
   } catch (e) {
     $("recoStatus").textContent = `Erreur : ${e.message}`;
   } finally {
     $("loadReco").disabled = false;
+    $("refreshReco").disabled = false;
   }
 }
 
@@ -185,10 +190,37 @@ function openComposer(ctx) {
   $("composerText").value = "";
   $("composerError").hidden = true;
   updateComposerCount();
-  $("composerContext").innerHTML = composerState.title
-    ? `<div class="reco-title">${esc(composerState.title)}</div><div class="reco-meta">r/${esc(composerState.subreddit || "")}</div>`
-    : `<div class="muted-p">Réponse manuelle — colle l'URL du post/commentaire ci-dessous.</div>`;
+  renderComposerContext();
   $("composer").hidden = false;
+  if (composerState.url) fetchComposerContext(composerState.url);
+}
+
+async function fetchComposerContext(url) {
+  $("composerContext").innerHTML = '<div class="muted-p" style="margin:0">Lecture du thread (titre, corps, commentaires)…</div>';
+  try {
+    const sep = accountQuery() ? "&" : "?";
+    const data = await api(`/api/thread-context${accountQuery()}${sep}url=${encodeURIComponent(url)}`);
+    composerState.title = data.title || composerState.title;
+    composerState.subreddit = data.subreddit || composerState.subreddit;
+    composerState.body = data.body || "";
+    composerState.comments = data.comments || [];
+    renderComposerContext();
+  } catch (e) {
+    renderComposerContext(e.message);
+  }
+}
+
+function renderComposerContext(err) {
+  const s = composerState;
+  if (!s.title && !s.url) {
+    $("composerContext").innerHTML = `<div class="muted-p" style="margin:0">Réponse manuelle — colle l'URL ci-dessous puis « Brouillon IA » (le contexte sera lu automatiquement).</div>`;
+    return;
+  }
+  let html = `<div class="reco-title">${esc(s.title || "(thread)")}</div><div class="reco-meta">r/${esc(s.subreddit || "")}</div>`;
+  if (s.body) html += `<div class="ctx-body">${esc(s.body.slice(0, 400))}${s.body.length > 400 ? "…" : ""}</div>`;
+  if (s.comments && s.comments.length) html += `<div class="muted-p" style="margin:6px 0 0">✓ ${s.comments.length} commentaires lus (ton/humour)</div>`;
+  if (err) html += `<div class="muted-p" style="margin:6px 0 0">Contexte indisponible (${esc(err)}) — réponse basée sur le titre.</div>`;
+  $("composerContext").innerHTML = html;
 }
 function closeComposer() {
   $("composer").hidden = true;
@@ -203,6 +235,12 @@ async function aiDraft() {
   $("aiDraft").textContent = "Génération…";
   $("composerError").hidden = true;
   try {
+    // Si pas encore de contexte mais une URL est saisie, on le lit d'abord.
+    const url = $("composerUrl").value.trim();
+    if (url && (!composerState.comments || composerState.url !== url)) {
+      composerState.url = url;
+      await fetchComposerContext(url);
+    }
     const data = await api("/api/draft-reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -210,6 +248,7 @@ async function aiDraft() {
         title: composerState.title || "(post Reddit)",
         subreddit: composerState.subreddit || "AskReddit",
         body: composerState.body || "",
+        comments: composerState.comments || [],
       }),
     });
     $("composerText").value = data.text || "";
@@ -380,7 +419,8 @@ $("accountSelect").addEventListener("change", () => {
   $("recoStatus").textContent = "";
   loadDrafts();
 });
-$("loadReco").addEventListener("click", loadReco);
+$("loadReco").addEventListener("click", () => loadReco(false));
+$("refreshReco").addEventListener("click", () => loadReco(true));
 $("newManual").addEventListener("click", () => openComposer(null));
 $("composerClose").addEventListener("click", closeComposer);
 $("composerCancel").addEventListener("click", closeComposer);

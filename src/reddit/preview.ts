@@ -122,3 +122,53 @@ export async function fetchPreview(
 
   return preview;
 }
+
+export type ThreadContext = {
+  title: string;
+  subreddit: string;
+  body: string;
+  comments: Array<{ author: string; body: string; score: number }>;
+};
+
+/**
+ * Contexte complet d'un thread pour la génération de réponse : titre, corps, et
+ * top commentaires (pour capter le ton / l'humour). Via .json authentifié.
+ */
+export async function fetchThreadContext(
+  context: BrowserContext,
+  rawUrl: string,
+  maxComments = 8,
+): Promise<ThreadContext> {
+  const target = parseRedditUrl(rawUrl);
+  const response = await context.request.get(target.jsonUrl, {
+    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "application/json" },
+    timeout: 30000,
+  });
+  if (!response.ok()) throw new Error(`Reddit a renvoyé ${response.status()} (session ? rate-limit ?).`);
+
+  const payload = (await response.json()) as unknown;
+  if (!Array.isArray(payload) || payload.length < 1) throw new Error("Réponse .json inattendue.");
+
+  const postData = (payload[0] as Listing).data?.children?.[0]?.data ?? {};
+  const commentChildren = (payload[1] as Listing | undefined)?.data?.children ?? [];
+
+  const comments: ThreadContext["comments"] = [];
+  for (const child of commentChildren) {
+    if (child.kind !== "t1" || !child.data) continue;
+    const body = asString(child.data.body);
+    if (!body || body === "[deleted]" || body === "[removed]") continue;
+    comments.push({
+      author: asString(child.data.author, "[?]"),
+      body: body.slice(0, 600),
+      score: asNumber(child.data.score),
+    });
+    if (comments.length >= maxComments) break;
+  }
+
+  return {
+    title: asString(postData.title, "[sans titre]"),
+    subreddit: asString(postData.subreddit, ""),
+    body: asString(postData.selftext).slice(0, 2000),
+    comments,
+  };
+}

@@ -19,10 +19,11 @@ import {
   replyInput,
   scheduleInput,
 } from "./schemas.js";
-import { fetchPreview } from "./reddit/preview.js";
+import { fetchPreview, fetchThreadContext } from "./reddit/preview.js";
 import { getEgressIp } from "./reddit/browser.js";
 import { fetchUserActivity } from "./reddit/read.js";
 import { recommendDayuse, recommendGeneric } from "./recommend/recommend.js";
+import { getCachedReco, setCachedReco } from "./recommend/cache.js";
 import { draftReply } from "./ai.js";
 import { addDraft, readDrafts, removeDraft, updateDraft } from "./drafts/store.js";
 import { postReply } from "./reddit/poster.js";
@@ -274,17 +275,26 @@ app.delete<{ Params: { id: string } }>("/api/schedule/:id", async (request, repl
 });
 
 /** Recommandations de threads (lecture .json authentifiée via la session). */
-app.get<{ Querystring: { account?: string; stream?: string } }>(
+app.get<{ Querystring: { account?: string; stream?: string; refresh?: string } }>(
   "/api/recommendations",
   async (request, reply) => {
     const accountId = request.query.account ?? defaultAccountId();
     const stream = request.query.stream === "dayuse" ? "dayuse" : "generic";
+
+    // Recos identiques pour tous les comptes, rafraîchies 1×/jour → cache.
+    if (request.query.refresh !== "1") {
+      const cached = await getCachedReco(stream);
+      if (cached) {
+        return { recommendations: cached.items, stream, generatedAt: cached.generatedAt, cached: true };
+      }
+    }
+
     try {
-      // Lecture via la session existante (pas d'auto-login fragile).
       const recos = await withAccount(accountId, (context) =>
         stream === "dayuse" ? recommendDayuse(context) : recommendGeneric(context),
       );
-      return { recommendations: recos, accountId, stream };
+      const entry = await setCachedReco(stream, recos);
+      return { recommendations: recos, stream, generatedAt: entry.generatedAt, cached: false };
     } catch (error) {
       return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
     }
@@ -306,7 +316,20 @@ app.get<{ Querystring: { account?: string; user?: string } }>("/api/published", 
   }
 });
 
-/** Brouillon de réponse assisté par Gemini. */
+/** Contexte d'un thread (titre + corps + top commentaires) pour la rédaction. */
+app.get<{ Querystring: { account?: string; url?: string } }>("/api/thread-context", async (request, reply) => {
+  const url = request.query.url;
+  if (!url) return reply.code(400).send({ error: "Paramètre ?url= requis." });
+  const accountId = request.query.account ?? defaultAccountId();
+  try {
+    const ctx = await withAccount(accountId, (context) => fetchThreadContext(context, url));
+    return ctx;
+  } catch (error) {
+    return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/** Brouillon de réponse assisté par IA. */
 app.post("/api/draft-reply", async (request, reply) => {
   const parsed = draftReplyInput.safeParse(request.body);
   if (!parsed.success) {
