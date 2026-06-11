@@ -38,6 +38,7 @@ import {
   proxyBaseConfigured,
   publicAccounts,
   removeAccount,
+  resolveAccountProxy,
   rotateAccountIp,
   slugifyId,
 } from "./reddit/accounts.js";
@@ -161,6 +162,27 @@ app.delete<{ Params: { id: string } }>("/api/accounts/:id", async (request, repl
     return reply.code(404).send({ error: "Compte introuvable ou non supprimable (compte d'environnement)." });
   }
   return { ok: true };
+});
+
+/**
+ * Config proxy résolue d'un compte (serveur + username avec jeton + mot de passe).
+ * Sert à se connecter EN LOCAL via la même IP résidentielle que l'outil : vrai
+ * navigateur (pas de détection d'automatisation) + IP dédiée du compte.
+ */
+app.get<{ Params: { id: string } }>("/api/accounts/:id/proxy-config", async (request, reply) => {
+  const account = getAccount(request.params.id);
+  if (!account) return reply.code(404).send({ error: "Compte introuvable." });
+  const proxy = resolveAccountProxy(account);
+  if (!proxy?.server) {
+    return reply.code(400).send({ error: "Aucun proxy configuré pour ce compte (choisis un pays)." });
+  }
+  return {
+    id: account.id,
+    label: account.label,
+    server: proxy.server,
+    username: proxy.username ?? "",
+    password: proxy.password ?? "",
+  };
 });
 
 /** Change l'IP résidentielle d'un compte (nouveau jeton de session Decodo). */

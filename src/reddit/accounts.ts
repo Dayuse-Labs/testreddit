@@ -70,6 +70,15 @@ export function rotateAccountIp(accountId: string): number {
   return next;
 }
 
+/** Oublie la rotation d'un compte (à sa suppression) pour repartir propre si recréé. */
+function clearRotation(accountId: string): void {
+  const rotations = readRotations();
+  if (!(accountId in rotations)) return;
+  delete rotations[accountId];
+  mkdirSync(DATA_DIR, { recursive: true });
+  writeFileSync(IP_ROTATION_FILE, JSON.stringify(rotations, null, 2), "utf8");
+}
+
 /**
  * Jeton de session sticky alphanumérique, unique par compte (→ IP dédiée). Suffixé
  * par le n° de rotation : changer de rotation = changer d'IP résidentielle.
@@ -228,6 +237,7 @@ export function removeAccount(id: string): boolean {
   const next = items.filter((a) => a.id !== id);
   if (next.length === items.length) return false;
   writeFileAccounts(next);
+  clearRotation(id);
   return true;
 }
 

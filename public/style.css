@@ -879,6 +879,52 @@ td button.link-danger:hover {
   width: 100%;
 }
 
+/* ---------- Config proxy (connexion locale) ---------- */
+.proxy-steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-2, #555);
+  line-height: 1.5;
+}
+
+.proxy-steps li {
+  margin-bottom: 4px;
+}
+
+.proxy-field {
+  margin-bottom: 10px;
+}
+
+.proxy-field > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2, #777);
+  margin-bottom: 3px;
+}
+
+.proxy-val {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2, #f4f4f7);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.proxy-val code {
+  flex: 1;
+  font-size: 12px;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.proxy-val .btn-link {
+  flex: none;
+  white-space: nowrap;
+}
+
 /* ---------- Logs en direct (drawer) ---------- */
 .log-drawer {
   position: fixed;

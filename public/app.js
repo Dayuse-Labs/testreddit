@@ -70,6 +70,9 @@ function renderAccountsView(accounts) {
       ]
         .map((t) => `<span class="chip">${t}</span>`)
         .join("");
+      const proxyBtn = a.hasProxy
+        ? `<button class="btn-link" data-proxy="${esc(a.id)}" title="Se connecter en local via l'IP dédiée de ce compte">Connexion locale</button>`
+        : "";
       const rotateBtn = a.hasProxy
         ? `<button class="btn-link" data-rotate="${esc(a.id)}" title="Change l'IP résidentielle si l'actuelle est bloquée par Reddit">Changer d'IP</button>`
         : "";
@@ -82,7 +85,7 @@ function renderAccountsView(accounts) {
           <button class="btn btn-ghost btn-sm" data-use="${esc(a.id)}">Utiliser</button>
         </div>
         <div class="reco-meta">${tags}</div>
-        <div class="account-card-foot">${rotateBtn}${del}</div>
+        <div class="account-card-foot">${proxyBtn}${rotateBtn}${del}</div>
       </div>`;
     })
     .join("");
@@ -92,10 +95,13 @@ $("accountsList").addEventListener("click", async (e) => {
   const use = e.target.closest("[data-use]");
   const del = e.target.closest("[data-del]");
   const rotate = e.target.closest("[data-rotate]");
+  const proxy = e.target.closest("[data-proxy]");
   if (use) {
     currentAccountId = use.getAttribute("data-use");
     $("accountSelect").value = currentAccountId;
     renderAccountsView((await api("/api/accounts")).accounts || []);
+  } else if (proxy) {
+    openProxyConfig(proxy.getAttribute("data-proxy"));
   } else if (rotate) {
     const id = rotate.getAttribute("data-rotate");
     rotate.disabled = true;
@@ -151,6 +157,85 @@ async function addAccount() {
     $("acSave").disabled = false;
   }
 }
+
+// --- Connexion locale via l'IP dédiée (config proxy + script de lancement) ----
+let proxyCfg = null;
+
+async function openProxyConfig(id) {
+  try {
+    const cfg = await api(`/api/accounts/${encodeURIComponent(id)}/proxy-config`);
+    proxyCfg = cfg;
+    $("proxyAccLabel").textContent = cfg.label;
+    $("proxyServer").textContent = cfg.server;
+    $("proxyUser").textContent = cfg.username;
+    $("proxyPass").textContent = cfg.password;
+    $("proxyModal").hidden = false;
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+/** Script .command (Mac) : ouvre un Chrome dédié au compte, sortant par son IP Decodo. */
+function buildLaunchScript(cfg) {
+  const profile = `reddit-${cfg.id}`;
+  return [
+    "#!/bin/bash",
+    `# === Connexion Reddit isolée — ${cfg.label} ===`,
+    "# Ouvre un Chrome dédié à ce compte, qui sort par son IP résidentielle Decodo.",
+    "# Profil séparé = ce compte n'est pas relié aux autres.",
+    "#",
+    "# Quand Chrome demande les identifiants du PROXY, saisis :",
+    `#   Utilisateur : ${cfg.username}`,
+    `#   Mot de passe : ${cfg.password}`,
+    "",
+    'PROFILE="$HOME/.reddit-profiles/' + profile + '"',
+    'mkdir -p "$PROFILE"',
+    'CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"',
+    'if [ ! -x "$CHROME" ]; then echo "Google Chrome introuvable dans /Applications."; read -n1 -r; exit 1; fi',
+    `echo "Compte : ${cfg.label}"`,
+    `echo "Proxy  : ${cfg.server}"`,
+    `echo "User   : ${cfg.username}"`,
+    `echo "Pass   : ${cfg.password}"`,
+    'echo "→ Colle ces identifiants quand Chrome demande le proxy, puis connecte-toi à Reddit."',
+    `"$CHROME" --user-data-dir="$PROFILE" --proxy-server="${cfg.server}" --no-first-run --no-default-browser-check "https://www.reddit.com/login/"`,
+    "",
+  ].join("\n");
+}
+
+function downloadLaunchScript() {
+  if (!proxyCfg) return;
+  const blob = new Blob([buildLaunchScript(proxyCfg)], { type: "application/x-sh" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `connexion-${proxyCfg.id}.command`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function copyValue(id) {
+  try {
+    await navigator.clipboard.writeText($(id).textContent || "");
+  } catch {
+    /* ignore */
+  }
+}
+
+$("proxyClose").addEventListener("click", () => ($("proxyModal").hidden = true));
+$("proxyDownload").addEventListener("click", downloadLaunchScript);
+$("proxyModal").addEventListener("click", (e) => {
+  const copy = e.target.closest("[data-copy]");
+  if (copy) {
+    copyValue(copy.getAttribute("data-copy"));
+    const prev = copy.textContent;
+    copy.textContent = "Copié ✓";
+    setTimeout(() => (copy.textContent = prev), 1200);
+  } else if (e.target === $("proxyModal")) {
+    $("proxyModal").hidden = true;
+  }
+});
 
 // --- Onglets -----------------------------------------------------------------
 document.querySelectorAll(".tab").forEach((tab) => {

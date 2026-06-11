@@ -177,6 +177,33 @@
       </div>
     </div>
 
+    <!-- ===== CONFIG PROXY (connexion locale via l'IP dédiée) ===== -->
+    <div id="proxyModal" class="modal" hidden>
+      <div class="modal-box">
+        <div class="modal-head">
+          <h3>Connexion locale — <span id="proxyAccLabel"></span></h3>
+          <button id="proxyClose" type="button" class="modal-close">×</button>
+        </div>
+        <p class="muted-p">
+          Connecte-toi à Reddit depuis <strong>ton vrai navigateur</strong>, mais en sortant par
+          l'<strong>IP résidentielle dédiée</strong> de ce compte. Pas de détection d'automatisation, et
+          le compte n'est pas relié aux autres (profil Chrome isolé).
+        </p>
+        <ol class="proxy-steps">
+          <li>Télécharge et double-clique le script ci-dessous (ouvre un Chrome dédié à ce compte).</li>
+          <li>Quand Chrome demande les identifiants du <strong>proxy</strong>, colle l'<strong>utilisateur</strong> et le <strong>mot de passe</strong> ci-dessous.</li>
+          <li>Connecte-toi à Reddit normalement (vrai humain).</li>
+          <li>Envoie la session à l'outil via l'extension → connecté, isolé, cohérent.</li>
+        </ol>
+        <div class="proxy-field"><label>Serveur proxy</label><div class="proxy-val"><code id="proxyServer"></code><button class="btn-link" data-copy="proxyServer">Copier</button></div></div>
+        <div class="proxy-field"><label>Utilisateur</label><div class="proxy-val"><code id="proxyUser"></code><button class="btn-link" data-copy="proxyUser">Copier</button></div></div>
+        <div class="proxy-field"><label>Mot de passe</label><div class="proxy-val"><code id="proxyPass"></code><button class="btn-link" data-copy="proxyPass">Copier</button></div></div>
+        <div class="modal-actions">
+          <button id="proxyDownload" type="button" class="btn btn-primary">⬇︎ Script de lancement (.command)</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== LOGS EN DIRECT (drawer) ===== -->
     <div id="logDrawer" class="log-drawer" hidden>
       <div class="log-head">
