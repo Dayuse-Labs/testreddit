@@ -3,6 +3,7 @@ import {
   ACCOUNTS_B64,
   DATA_DIR,
   HAS_ENV_CREDENTIALS,
+  IP_ROTATION_FILE,
   PROXY_BASE_USERNAME,
   PROXY_ENABLED,
   PROXY_PASSWORD,
@@ -39,18 +40,57 @@ export function proxyBaseConfigured(): boolean {
   return PROXY_SERVER.length > 0 && PROXY_BASE_USERNAME.length > 0;
 }
 
-/** Jeton de session sticky alphanumérique, STABLE et unique par compte (→ IP dédiée). */
-function sessionToken(accountId: string): string {
-  return (accountId.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 32) || "acct");
+// --- Rotation d'IP par compte ------------------------------------------------
+// Le jeton de session sticky est dérivé de l'id du compte (→ IP stable). Si l'IP
+// du pool Decodo est flaggée par Reddit, on « tourne » : on incrémente un
+// compteur persistant, ce qui change le jeton → nouvelle IP résidentielle.
+
+function readRotations(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(readFileSync(IP_ROTATION_FILE, "utf8")) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Numéro de rotation d'IP courant du compte (0 = IP initiale). */
+export function getRotation(accountId: string): number {
+  const value = readRotations()[accountId];
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+/** Incrémente la rotation → nouvelle IP au prochain lancement. Renvoie le n° courant. */
+export function rotateAccountIp(accountId: string): number {
+  const rotations = readRotations();
+  const next = getRotation(accountId) + 1;
+  rotations[accountId] = next;
+  mkdirSync(DATA_DIR, { recursive: true });
+  writeFileSync(IP_ROTATION_FILE, JSON.stringify(rotations, null, 2), "utf8");
+  return next;
 }
 
 /**
- * Garantit un jeton `-session-XXX` stable dans un username proxy collé à la main
- * (pour que l'IP reste fixe). N'écrase pas un jeton déjà présent.
+ * Jeton de session sticky alphanumérique, unique par compte (→ IP dédiée). Suffixé
+ * par le n° de rotation : changer de rotation = changer d'IP résidentielle.
+ */
+function sessionToken(accountId: string): string {
+  const base = accountId.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 28) || "acct";
+  const rotation = getRotation(accountId);
+  return rotation > 0 ? `${base}r${rotation}` : base;
+}
+
+/**
+ * Pose le jeton `-session-XXX` (rotation incluse) dans un username proxy collé à
+ * la main. Si rotation > 0, on REMPLACE un jeton existant (pour changer d'IP) ;
+ * sinon on l'ajoute seulement s'il est absent (on respecte le jeton de l'utilisateur).
  */
 function ensureStickySession(username: string, accountId: string): string {
-  if (/-session-[^-]+/.test(username)) return username;
   const token = sessionToken(accountId);
+  const hasToken = /-session-[^-]+/.test(username);
+  if (hasToken) {
+    return getRotation(accountId) > 0 ? username.replace(/-session-[^-]+/, `-session-${token}`) : username;
+  }
   if (/-sessionduration-/.test(username)) {
     return username.replace(/-sessionduration-/, `-session-${token}-sessionduration-`);
   }
@@ -198,6 +238,7 @@ export function publicAccounts(): Array<{
   redditUsername?: string;
   hasProxy: boolean;
   proxyCountry?: string;
+  ipRotation: number;
   hasCredentials: boolean;
   removable: boolean;
 }> {
@@ -208,6 +249,7 @@ export function publicAccounts(): Array<{
     ...(account.redditUsername ? { redditUsername: account.redditUsername } : {}),
     hasProxy: Boolean(resolveAccountProxy(account)?.server),
     ...(account.proxyCountry ? { proxyCountry: account.proxyCountry } : {}),
+    ipRotation: getRotation(account.id),
     hasCredentials: Boolean(account.credentials),
     removable: fileIds.has(account.id),
   }));

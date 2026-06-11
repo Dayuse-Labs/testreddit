@@ -94,6 +94,13 @@ export const RUNTIME_ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.json");
 export const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
 
 /**
+ * Compteur de rotation d'IP par compte. Incrémenté via « Changer d'IP » : modifie
+ * le jeton de session sticky Decodo → nouvelle IP résidentielle (pour fuir une IP
+ * du pool flaggée par Reddit). `{ [accountId]: number }`.
+ */
+export const IP_ROTATION_FILE = path.join(DATA_DIR, "ip-rotation.json");
+
+/**
  * Protection optionnelle par Basic Auth. Si APP_PASSWORD est défini, toutes les
  * routes l'exigent (indispensable dès que l'outil est exposé sur Internet).
  */

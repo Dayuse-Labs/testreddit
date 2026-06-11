@@ -38,6 +38,7 @@ import {
   proxyBaseConfigured,
   publicAccounts,
   removeAccount,
+  rotateAccountIp,
   slugifyId,
 } from "./reddit/accounts.js";
 import { accountCreateInput } from "./schemas.js";
@@ -160,6 +161,23 @@ app.delete<{ Params: { id: string } }>("/api/accounts/:id", async (request, repl
     return reply.code(404).send({ error: "Compte introuvable ou non supprimable (compte d'environnement)." });
   }
   return { ok: true };
+});
+
+/** Change l'IP résidentielle d'un compte (nouveau jeton de session Decodo). */
+app.post<{ Params: { id: string } }>("/api/accounts/:id/rotate-ip", async (request, reply) => {
+  const id = request.params.id;
+  const account = getAccount(id);
+  if (!account) {
+    return reply.code(404).send({ error: "Compte introuvable." });
+  }
+  if (!proxyBaseConfigured() && !account.proxy?.server) {
+    return reply.code(400).send({ error: "Aucun proxy configuré pour ce compte — rien à faire tourner." });
+  }
+  const rotation = rotateAccountIp(id);
+  // Ferme le contexte courant : la prochaine connexion repartira sur la nouvelle IP.
+  await resetContext();
+  logLine(`🔄 Nouvelle IP pour « ${accountLabel(id)} » (rotation #${rotation}). Relance « Se connecter (manuel) ».`);
+  return { ok: true, rotation };
 });
 
 /** État de connexion d'un compte : vérification en LECTURE (sans auto-login). */

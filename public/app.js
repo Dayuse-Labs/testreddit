@@ -57,10 +57,11 @@ function renderAccountsView(accounts) {
   if (!list) return;
   list.innerHTML = accounts
     .map((a) => {
+      const rot = a.ipRotation > 0 ? ` · IP #${a.ipRotation}` : "";
       const proxyTag = a.proxyCountry
-        ? `IP dédiée ${COUNTRY_LABEL[a.proxyCountry] || a.proxyCountry.toUpperCase()} ✓`
+        ? `IP dédiée ${COUNTRY_LABEL[a.proxyCountry] || a.proxyCountry.toUpperCase()} ✓${rot}`
         : a.hasProxy
-          ? "proxy ✓"
+          ? `proxy ✓${rot}`
           : "sans proxy";
       const tags = [
         a.redditUsername ? `u/${esc(a.redditUsername)}` : "pseudo non défini",
@@ -69,6 +70,9 @@ function renderAccountsView(accounts) {
       ]
         .map((t) => `<span class="chip">${t}</span>`)
         .join("");
+      const rotateBtn = a.hasProxy
+        ? `<button class="btn-link" data-rotate="${esc(a.id)}" title="Change l'IP résidentielle si l'actuelle est bloquée par Reddit">Changer d'IP</button>`
+        : "";
       const del = a.removable
         ? `<button class="btn-link-danger" data-del="${esc(a.id)}">Supprimer</button>`
         : '<span class="muted-p" style="margin:0">env</span>';
@@ -78,7 +82,7 @@ function renderAccountsView(accounts) {
           <button class="btn btn-ghost btn-sm" data-use="${esc(a.id)}">Utiliser</button>
         </div>
         <div class="reco-meta">${tags}</div>
-        <div class="account-card-foot">${del}</div>
+        <div class="account-card-foot">${rotateBtn}${del}</div>
       </div>`;
     })
     .join("");
@@ -87,10 +91,25 @@ function renderAccountsView(accounts) {
 $("accountsList").addEventListener("click", async (e) => {
   const use = e.target.closest("[data-use]");
   const del = e.target.closest("[data-del]");
+  const rotate = e.target.closest("[data-rotate]");
   if (use) {
     currentAccountId = use.getAttribute("data-use");
     $("accountSelect").value = currentAccountId;
     renderAccountsView((await api("/api/accounts")).accounts || []);
+  } else if (rotate) {
+    const id = rotate.getAttribute("data-rotate");
+    rotate.disabled = true;
+    rotate.textContent = "Changement…";
+    try {
+      openLogs();
+      const r = await api(`/api/accounts/${encodeURIComponent(id)}/rotate-ip`, { method: "POST" });
+      await loadAccounts();
+      alert(`Nouvelle IP attribuée (rotation #${r.rotation}). Relance « Se connecter (manuel) » pour tester cette IP.`);
+    } catch (err) {
+      alert(err.message);
+      rotate.disabled = false;
+      rotate.textContent = "Changer d'IP";
+    }
   } else if (del) {
     if (confirm("Supprimer ce compte ?")) {
       await api(`/api/accounts/${encodeURIComponent(del.getAttribute("data-del"))}`, { method: "DELETE" }).catch((err) => alert(err.message));

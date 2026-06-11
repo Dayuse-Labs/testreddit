@@ -687,18 +687,32 @@ td button.link-danger:hover {
   align-items: center;
 }
 
+.btn-link,
 .btn-link-danger {
   background: none;
   border: none;
-  color: var(--err);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+}
+
+.btn-link {
+  color: var(--accent, #ff4500);
+}
+
+.btn-link-danger {
+  color: var(--err);
   margin-left: auto;
 }
 
+.btn-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-link:hover,
 .btn-link-danger:hover {
   text-decoration: underline;
 }
@@ -732,6 +746,9 @@ td button.link-danger:hover {
 
 .account-card-foot {
   margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .form-grid {
