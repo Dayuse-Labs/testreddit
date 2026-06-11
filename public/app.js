@@ -146,7 +146,7 @@ async function loadStatus() {
       el.textContent = "Non connecté";
       el.className = "status status--err";
       el.title = d.error || "";
-      $("reconnect").hidden = false;
+      $("reconnect").hidden = true; // auto-login désactivé (brûlait les comptes)
       $("manualLogin").hidden = false;
     }
     if (d.loggedIn) $("manualLogin").hidden = true;

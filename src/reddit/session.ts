@@ -93,39 +93,19 @@ export function resetLoginCooldown(accountId?: string): void {
 }
 
 /**
- * Vérifie la connexion ; si déconnecté et que le compte a des identifiants,
- * relance un login automatique. Réessaie avec une IP fraîche tant que l'échec
- * est lié à l'IP (blocage « network security ») — sans re-soumettre le mot de
- * passe. Opère sur le contexte courant du module (qu'il peut relancer).
+ * Vérifie UNIQUEMENT l'état de connexion (lecture). On ne soumet PLUS jamais le
+ * mot de passe automatiquement : la soumission scriptée est bloquée par Reddit
+ * (CAPTCHA) ET elle « brûle » le compte (throttle après tentatives répétées).
+ * La connexion se fait via « Se connecter (manuel) » (noVNC) ou l'extension.
  */
 async function loginIfNeeded(accountId: string): Promise<LoginResult> {
   if (!context) throw new Error("Contexte non initialisé");
-
   const existing = await getLoggedInUser(context).catch(() => null);
   if (existing) return { ok: true, user: existing };
-
-  const account = getAccount(accountId);
-  if (!account?.credentials) {
-    return { ok: false, error: "Compte déconnecté (pas d'identifiants pour reconnexion auto)." };
-  }
-
-  const last = lastLoginAttempt.get(accountId) ?? 0;
-  if (Date.now() - last < LOGIN_COOLDOWN_MS) {
-    return { ok: false, error: "Reconnexion récente échouée — nouvelle tentative différée." };
-  }
-  lastLoginAttempt.set(accountId, Date.now());
-
-  let result: LoginResult = { ok: false, error: "Échec de connexion." };
-  for (let attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
-    logLine(`Reconnexion « ${account.label} » — tentative ${attempt}/${MAX_LOGIN_ATTEMPTS}`);
-    result = await performLogin(context, account.credentials, Date.now() / 1000);
-    if (result.ok || !result.retryable) return result; // succès, ou échec dur (CAPTCHA/identifiants)
-    if (attempt < MAX_LOGIN_ATTEMPTS) {
-      logLine("Rotation : nouvelle IP résidentielle…");
-      await relaunchContext(accountId); // IP bloquée → autre IP
-    }
-  }
-  return result;
+  return {
+    ok: false,
+    error: 'Compte non connecté — utilise « Se connecter (manuel) » (ou envoie la session via l\'extension).',
+  };
 }
 
 /**
