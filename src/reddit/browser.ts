@@ -97,7 +97,14 @@ export async function launchContextForAccount(
     headless,
     executablePath: chromiumPath(),
     ...proxy,
-    args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    args: [
+      "--disable-blink-features=AutomationControlled",
+      "--no-sandbox",
+      // En headed (écran virtuel/VNC) : fenêtre plein écran, visible et au 1er plan.
+      "--window-position=0,0",
+      "--window-size=1360,900",
+      "--start-maximized",
+    ],
   });
 
   const storageState = account.sessionB64
@@ -108,6 +115,8 @@ export async function launchContextForAccount(
 
   const ctx = await browser.newContext({
     ...COMMON_OPTIONS,
+    // En headed, on laisse la fenêtre dicter la taille (viewport plein écran).
+    viewport: headless ? COMMON_OPTIONS.viewport : null,
     ...(storageState ? { storageState } : {}),
   });
   return ctx;

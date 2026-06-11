@@ -255,9 +255,11 @@ export async function startManualLogin(accountId: string): Promise<void> {
       context = await launchContextForAccount(account, false); // fenêtre visible
       currentAccountId = id;
       const page = await getPage(context);
+      await page.bringToFront().catch(() => undefined);
       await page
         .goto("https://www.reddit.com/login/", { waitUntil: "domcontentloaded" })
         .catch(() => undefined);
+      await page.bringToFront().catch(() => undefined);
       logLine(`Connexion manuelle « ${account.label} » : fenêtre ouverte, connecte-toi.`);
     } catch (error) {
       switching = false;
