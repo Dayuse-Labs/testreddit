@@ -72,9 +72,9 @@ export const LOCAL_MODE =
 /** Fichier local (gitignoré) listant les comptes en préparation pour build-accounts. */
 export const ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.local.json");
 
-/** Clé API Gemini (Google) pour les brouillons de réponse. À mettre en variable d'env. */
-export const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
-export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+/** Clé API OpenAI pour les brouillons de réponse. À mettre en variable d'env. */
+export const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? "";
+export const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
 /** Fichier JSON de la file de brouillons (réponses préparées, publiées par un humain). */
 export const DRAFTS_FILE = path.join(DATA_DIR, "drafts.json");

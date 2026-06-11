@@ -139,7 +139,7 @@ async function aiDraft() {
     showComposerError(e.message);
   } finally {
     $("aiDraft").disabled = false;
-    $("aiDraft").textContent = "✨ Brouillon IA (Gemini)";
+    $("aiDraft").textContent = "✨ Brouillon IA";
   }
 }
 

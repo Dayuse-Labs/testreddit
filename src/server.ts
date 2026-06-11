@@ -23,7 +23,7 @@ import { fetchPreview } from "./reddit/preview.js";
 import { getEgressIp } from "./reddit/browser.js";
 import { fetchUserActivity } from "./reddit/read.js";
 import { recommendDayuse, recommendGeneric } from "./recommend/recommend.js";
-import { draftReply } from "./gemini.js";
+import { draftReply } from "./ai.js";
 import { addDraft, readDrafts, removeDraft, updateDraft } from "./drafts/store.js";
 import { postReply } from "./reddit/poster.js";
 import { parseRedditUrl } from "./reddit/url.js";
