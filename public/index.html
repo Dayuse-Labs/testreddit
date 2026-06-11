@@ -47,17 +47,30 @@
         </div>
         <div class="card">
           <h2>Ajouter un compte</h2>
-          <p class="muted-p">Le proxy résidentiel et les identifiants sont optionnels mais recommandés (lecture/publication fiables).</p>
+          <p class="muted-p">Choisis un pays : l'outil génère <strong>automatiquement</strong> une IP résidentielle dédiée (jeton de session unique par compte). Aucune chaîne proxy à coller.</p>
           <div class="form-grid">
             <div><label for="acLabel">Nom du marché *</label><input id="acLabel" type="text" placeholder="ex. France" /></div>
             <div><label for="acReddit">Pseudo Reddit (u/…)</label><input id="acReddit" type="text" placeholder="ex. DayuseFR" /></div>
-            <div><label for="acProxyServer">Proxy — serveur</label><input id="acProxyServer" type="text" placeholder="http://gate.decodo.com:10003" /></div>
-            <div><label for="acProxyUser">Proxy — utilisateur</label><input id="acProxyUser" type="text" placeholder="user-...-country-fr-..." /></div>
-            <div><label for="acProxyPass">Proxy — mot de passe</label><input id="acProxyPass" type="password" /></div>
+            <div>
+              <label for="acCountry">Pays de l'IP dédiée</label>
+              <select id="acCountry">
+                <option value="us">🇺🇸 États-Unis</option>
+                <option value="fr">🇫🇷 France</option>
+                <option value="gb">🇬🇧 Royaume-Uni</option>
+                <option value="de">🇩🇪 Allemagne</option>
+                <option value="es">🇪🇸 Espagne</option>
+                <option value="it">🇮🇹 Italie</option>
+                <option value="ca">🇨🇦 Canada</option>
+                <option value="nl">🇳🇱 Pays-Bas</option>
+                <option value="be">🇧🇪 Belgique</option>
+                <option value="">— Aucun (pas de proxy)</option>
+              </select>
+            </div>
             <div><label for="acUser">Reddit — email/pseudo</label><input id="acUser" type="text" /></div>
             <div><label for="acPass">Reddit — mot de passe</label><input id="acPass" type="password" /></div>
             <div><label for="acTotp">2FA TOTP (optionnel)</label><input id="acTotp" type="text" /></div>
           </div>
+          <p id="acProxyWarn" class="muted-p" hidden>⚠️ Base proxy Decodo non configurée (variables <code>PROXY_SERVER</code> / <code>PROXY_USERNAME</code> / <code>PROXY_PASSWORD</code>). Le pays choisi sera ignoré tant que ce n'est pas réglé sur le serveur.</p>
           <div id="acError" class="error" hidden></div>
           <button id="acSave" type="button" class="btn btn-primary">Ajouter le compte</button>
         </div>

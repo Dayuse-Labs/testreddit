@@ -3,6 +3,7 @@ import {
   ACCOUNTS_B64,
   DATA_DIR,
   HAS_ENV_CREDENTIALS,
+  PROXY_BASE_USERNAME,
   PROXY_ENABLED,
   PROXY_PASSWORD,
   PROXY_SERVER,
@@ -28,6 +29,63 @@ function envProxy(): ProxyConfig | undefined {
     ...(PROXY_USERNAME ? { username: PROXY_USERNAME } : {}),
     ...(PROXY_PASSWORD ? { password: PROXY_PASSWORD } : {}),
   };
+}
+
+/** Durée de vie d'une session sticky Decodo (minutes) — l'IP reste stable. */
+const PROXY_SESSION_DURATION = 1440;
+
+/** true si la base Decodo (serveur + username de base) est configurée (env). */
+export function proxyBaseConfigured(): boolean {
+  return PROXY_SERVER.length > 0 && PROXY_BASE_USERNAME.length > 0;
+}
+
+/** Jeton de session sticky alphanumérique, STABLE et unique par compte (→ IP dédiée). */
+function sessionToken(accountId: string): string {
+  return (accountId.replace(/[^a-z0-9]/gi, "").toLowerCase().slice(0, 32) || "acct");
+}
+
+/**
+ * Garantit un jeton `-session-XXX` stable dans un username proxy collé à la main
+ * (pour que l'IP reste fixe). N'écrase pas un jeton déjà présent.
+ */
+function ensureStickySession(username: string, accountId: string): string {
+  if (/-session-[^-]+/.test(username)) return username;
+  const token = sessionToken(accountId);
+  if (/-sessionduration-/.test(username)) {
+    return username.replace(/-sessionduration-/, `-session-${token}-sessionduration-`);
+  }
+  return `${username}-session-${token}`;
+}
+
+/**
+ * Résout le proxy effectif d'un compte → IP résidentielle dédiée et STABLE :
+ * - proxy explicite (avancé) : utilisé tel quel (jeton sticky garanti) ;
+ * - sinon proxyCountry + base Decodo (env) : on génère
+ *   `<base>-country-<cc>-session-<id>-sessionduration-1440` — chaque compte a
+ *   ainsi son propre jeton de session, donc sa propre IP résidentielle.
+ */
+export function resolveAccountProxy(account: Account): ProxyConfig | undefined {
+  if (account.proxy?.server) {
+    const username = account.proxy.username
+      ? ensureStickySession(account.proxy.username, account.id)
+      : undefined;
+    return {
+      server: account.proxy.server,
+      ...(username ? { username } : {}),
+      ...(account.proxy.password ? { password: account.proxy.password } : {}),
+    };
+  }
+  if (account.proxyCountry && proxyBaseConfigured()) {
+    const username =
+      `${PROXY_BASE_USERNAME}-country-${account.proxyCountry}` +
+      `-session-${sessionToken(account.id)}-sessionduration-${PROXY_SESSION_DURATION}`;
+    return {
+      server: PROXY_SERVER,
+      username,
+      ...(PROXY_PASSWORD ? { password: PROXY_PASSWORD } : {}),
+    };
+  }
+  return undefined;
 }
 
 function envCredentials(): Credentials | undefined {
@@ -139,6 +197,7 @@ export function publicAccounts(): Array<{
   label: string;
   redditUsername?: string;
   hasProxy: boolean;
+  proxyCountry?: string;
   hasCredentials: boolean;
   removable: boolean;
 }> {
@@ -147,7 +206,8 @@ export function publicAccounts(): Array<{
     id: account.id,
     label: account.label,
     ...(account.redditUsername ? { redditUsername: account.redditUsername } : {}),
-    hasProxy: Boolean(account.proxy?.server),
+    hasProxy: Boolean(resolveAccountProxy(account)?.server),
+    ...(account.proxyCountry ? { proxyCountry: account.proxyCountry } : {}),
     hasCredentials: Boolean(account.credentials),
     removable: fileIds.has(account.id),
   }));

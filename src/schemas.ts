@@ -43,8 +43,14 @@ export const accountSchema = z.object({
   credentials: credentialsSchema.optional(),
   /** Pseudo Reddit affiché (u/…), pour l'onglet « Publié ». */
   redditUsername: z.string().trim().optional(),
-  /** Proxy résidentiel (lecture/publication fiables). */
+  /** Proxy résidentiel explicite (legacy / avancé). Sinon, généré via proxyCountry. */
   proxy: proxyConfigSchema.optional(),
+  /**
+   * Pays de l'IP résidentielle dédiée (code à 2 lettres, ex. « us », « fr »).
+   * Le proxy complet est généré automatiquement depuis la base Decodo + un
+   * jeton de session unique par compte (IP distincte par compte).
+   */
+  proxyCountry: z.string().trim().toLowerCase().min(2).max(2).optional(),
   /** true uniquement pour le compte local (profil persistant + login manuel). */
   local: z.boolean().optional(),
 });
@@ -98,6 +104,9 @@ export const sessionInput = z.object({
 export const accountCreateInput = z.object({
   label: z.string().trim().min(1, "Nom du compte requis"),
   redditUsername: z.string().trim().optional(),
+  /** Pays de l'IP dédiée (code à 2 lettres). Le proxy est généré automatiquement. */
+  proxyCountry: z.string().trim().toLowerCase().min(2).max(2).optional(),
+  /** Proxy explicite (avancé) — laissé pour compatibilité, non requis. */
   proxyServer: z.string().trim().optional(),
   proxyUsername: z.string().trim().optional(),
   proxyPassword: z.string().optional(),

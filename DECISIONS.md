@@ -11,9 +11,17 @@ ce qui est publié.
 ## Ce qu'on a construit puis exploré (automatisation)
 1. **Publication via navigateur (Playwright)** depuis une session connectée, avec
    aperçu du fil, historique, programmation d'envois.
-2. **Proxy résidentiel (Decodo)** par compte pour sortir en IP résidentielle
-   (géolocalisée), avec **jeton de session neuf à chaque lancement** (fix des 502
-   « ERR_TUNNEL_CONNECTION_FAILED » des sessions sticky périmées).
+2. **Proxy résidentiel (Decodo)** : **une IP dédiée et STABLE par compte**. La
+   base Decodo (serveur + username de base + mot de passe) est configurée **une
+   seule fois** (variables d'env `PROXY_SERVER` / `PROXY_USERNAME` /
+   `PROXY_PASSWORD`). À la création d'un compte, l'UI demande juste un **pays** :
+   l'outil génère le username complet
+   `<base>-country-<cc>-session-<idCompte>-sessionduration-1440` — le jeton de
+   session, **dérivé de l'id du compte**, est unique → chaque compte sort par une
+   IP résidentielle distincte (évite que Reddit relie les comptes). Le jeton est
+   **stable** (l'IP du compte ne change pas d'un lancement à l'autre), à l'inverse
+   de l'ancien jeton « neuf à chaque lancement » (qui changeait d'IP en
+   permanence, mauvais pour l'identité du compte).
 3. **Anti-détection** : `rebrowser-playwright` (corrige la fuite CDP
    `Runtime.enable`) + plugin stealth, saisie « humaine » caractère par caractère.
 4. **Reconnexion automatique par identifiants** + 2FA TOTP + rotation d'IP.

@@ -35,6 +35,7 @@ import {
   addAccount,
   defaultAccountId,
   getAccount,
+  proxyBaseConfigured,
   publicAccounts,
   removeAccount,
   slugifyId,
@@ -105,7 +106,13 @@ function accountLabel(id: string | undefined): string {
 
 /** Liste des comptes configurés (sans secrets) + compte par défaut. */
 app.get("/api/accounts", async () => {
-  return { accounts: publicAccounts(), defaultId: defaultAccountId(), managed: !LOCAL_MODE };
+  return {
+    accounts: publicAccounts(),
+    defaultId: defaultAccountId(),
+    managed: !LOCAL_MODE,
+    // true = base Decodo configurée → l'UI peut générer une IP dédiée par pays.
+    proxyAuto: proxyBaseConfigured(),
+  };
 });
 
 /** Ajoute un compte (marché) depuis l'interface. */
@@ -119,7 +126,11 @@ app.post("/api/accounts", async (request, reply) => {
     id: slugifyId(d.label),
     label: d.label,
     ...(d.redditUsername ? { redditUsername: d.redditUsername } : {}),
-    ...(d.proxyServer
+    // IP dédiée auto : on stocke juste le pays, le proxy complet est généré
+    // (base Decodo + jeton de session unique par compte) au lancement.
+    ...(d.proxyCountry ? { proxyCountry: d.proxyCountry } : {}),
+    // Proxy explicite (avancé) : seulement si fourni ET pas de pays choisi.
+    ...(!d.proxyCountry && d.proxyServer
       ? {
           proxy: {
             server: d.proxyServer,

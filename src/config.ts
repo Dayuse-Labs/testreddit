@@ -119,6 +119,15 @@ export const PROXY_PASSWORD = process.env.PROXY_PASSWORD ?? "";
 export const PROXY_ENABLED = PROXY_SERVER.length > 0;
 
 /**
+ * Username de base Decodo (sans les segments country/session/sessionduration),
+ * ex. « user-martino99 ». Sert à générer une IP dédiée par compte automatiquement.
+ */
+export const PROXY_BASE_USERNAME = PROXY_USERNAME.replace(
+  /-(?:country|continent|city|state|region|session|sessionduration)-.*$/i,
+  "",
+);
+
+/**
  * User-Agent de navigateur réaliste, utilisé à la fois par Playwright et par
  * les requêtes .json passées via le contexte authentifié.
  */

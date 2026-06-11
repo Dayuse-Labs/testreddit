@@ -32,20 +32,39 @@ async function loadAccounts() {
       .map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`)
       .join("");
     if (currentAccountId) $("accountSelect").value = currentAccountId;
+    const warn = $("acProxyWarn");
+    if (warn) warn.hidden = data.proxyAuto !== false;
     renderAccountsView(accounts);
   } catch {
     /* ignore */
   }
 }
 
+const COUNTRY_LABEL = {
+  us: "🇺🇸 US",
+  fr: "🇫🇷 FR",
+  gb: "🇬🇧 UK",
+  de: "🇩🇪 DE",
+  es: "🇪🇸 ES",
+  it: "🇮🇹 IT",
+  ca: "🇨🇦 CA",
+  nl: "🇳🇱 NL",
+  be: "🇧🇪 BE",
+};
+
 function renderAccountsView(accounts) {
   const list = $("accountsList");
   if (!list) return;
   list.innerHTML = accounts
     .map((a) => {
+      const proxyTag = a.proxyCountry
+        ? `IP dédiée ${COUNTRY_LABEL[a.proxyCountry] || a.proxyCountry.toUpperCase()} ✓`
+        : a.hasProxy
+          ? "proxy ✓"
+          : "sans proxy";
       const tags = [
         a.redditUsername ? `u/${esc(a.redditUsername)}` : "pseudo non défini",
-        a.hasProxy ? "proxy ✓" : "sans proxy",
+        proxyTag,
         a.hasCredentials ? "identifiants ✓" : "sans identifiants",
       ]
         .map((t) => `<span class="chip">${t}</span>`)
@@ -96,15 +115,14 @@ async function addAccount() {
       body: JSON.stringify({
         label,
         redditUsername: $("acReddit").value.trim(),
-        proxyServer: $("acProxyServer").value.trim(),
-        proxyUsername: $("acProxyUser").value.trim(),
-        proxyPassword: $("acProxyPass").value,
+        ...($("acCountry").value ? { proxyCountry: $("acCountry").value } : {}),
         username: $("acUser").value.trim(),
         password: $("acPass").value,
         totpSecret: $("acTotp").value.trim(),
       }),
     });
-    ["acLabel", "acReddit", "acProxyServer", "acProxyUser", "acProxyPass", "acUser", "acPass", "acTotp"].forEach((id) => ($(id).value = ""));
+    ["acLabel", "acReddit", "acUser", "acPass", "acTotp"].forEach((id) => ($(id).value = ""));
+    $("acCountry").value = "us";
     $("acError").hidden = true;
     loadAccounts();
   } catch (e) {

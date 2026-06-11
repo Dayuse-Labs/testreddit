@@ -18,7 +18,7 @@ function chromiumPath(): string {
 }
 
 import { BROWSER_USER_AGENT, PROFILE_DIR } from "../config.js";
-import { localAccount } from "./accounts.js";
+import { localAccount, resolveAccountProxy } from "./accounts.js";
 import { getInjectedSession } from "./injected-sessions.js";
 import type { Account } from "../schemas.js";
 
@@ -29,38 +29,19 @@ const COMMON_OPTIONS = {
 } as const;
 
 /**
- * Génère un jeton de session sticky NEUF à chaque appel. Évite la réutilisation
- * d'un jeton « coincé » côté Decodo (qui finit en 502 une fois son IP libérée).
+ * Construit l'option proxy Playwright pour un compte. L'IP résidentielle est
+ * dédiée et STABLE par compte (jeton de session sticky dérivé de l'id) — voir
+ * resolveAccountProxy : chaque compte sort par une IP distincte, ce qui évite
+ * que Reddit relie les comptes entre eux.
  */
-function freshSessionToken(): string {
-  return "s" + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36);
-}
-
-/**
- * Remplace (ou insère) le jeton `-session-XXX` du username proxy par un jeton
- * neuf, en conservant `-sessionduration-N`. Chaque contexte obtient ainsi une IP
- * résidentielle stable pour sa durée de vie, sans réutiliser un jeton périmé.
- */
-function withFreshSession(username: string): string {
-  const token = freshSessionToken();
-  if (/-session-[^-]+/.test(username)) {
-    return username.replace(/-session-[^-]+/, `-session-${token}`);
-  }
-  if (/-sessionduration-/.test(username)) {
-    return username.replace(/-sessionduration-/, `-session-${token}-sessionduration-`);
-  }
-  return `${username}-session-${token}`;
-}
-
-/** Construit l'option proxy Playwright pour un compte donné, si défini. */
 function proxyOption(account: Account) {
-  if (!account.proxy?.server) return {};
-  const username = account.proxy.username ? withFreshSession(account.proxy.username) : undefined;
+  const proxy = resolveAccountProxy(account);
+  if (!proxy?.server) return {};
   return {
     proxy: {
-      server: account.proxy.server,
-      ...(username ? { username } : {}),
-      ...(account.proxy.password ? { password: account.proxy.password } : {}),
+      server: proxy.server,
+      ...(proxy.username ? { username: proxy.username } : {}),
+      ...(proxy.password ? { password: proxy.password } : {}),
     },
   };
 }
