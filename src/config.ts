@@ -7,8 +7,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Racine du projet (un niveau au-dessus de src/). */
 export const ROOT_DIR = path.resolve(__dirname, "..");
 
-/** Dossier de données local (gitignoré) : profil navigateur, historique, captures. */
-export const DATA_DIR = path.join(ROOT_DIR, "data");
+/**
+ * Dossier de données (profil navigateur, comptes ajoutés, sessions, historique).
+ * Sur Railway, ce dossier doit être un VOLUME persistant, sinon il est effacé à
+ * chaque redéploiement (les comptes ajoutés via l'UI disparaissent). On peut le
+ * pointer ailleurs via la variable d'env DATA_DIR (ex. le point de montage du
+ * volume) ; par défaut : <racine>/data (= /app/data dans le conteneur).
+ */
+export const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(ROOT_DIR, "data");
 
 /** Profil Chromium persistant : contient la session Reddit après login manuel. */
 export const PROFILE_DIR = path.join(DATA_DIR, "profile");
