@@ -1,50 +1,24 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-
-const els = {
-  status: $("status"),
-  egress: $("egress"),
-  accountSelect: $("accountSelect"),
-  switchAccount: $("switchAccount"),
-  url: $("url"),
-  loadPreview: $("loadPreview"),
-  previewError: $("previewError"),
-  preview: $("preview"),
-  text: $("text"),
-  charCount: $("charCount"),
-  reviewed: $("reviewed"),
-  publish: $("publish"),
-  sendAt: $("sendAt"),
-  scheduleBtn: $("scheduleBtn"),
-  result: $("result"),
-  refreshHistory: $("refreshHistory"),
-  historyBody: document.querySelector("#history tbody"),
-  refreshSchedule: $("refreshSchedule"),
-  scheduleBody: document.querySelector("#schedule tbody"),
-};
-
-let previewLoaded = false;
 let currentAccountId = null;
+let composerState = {};
 
-/** Suffixe de requête pour cibler le compte actif. */
-function accountQuery() {
-  return currentAccountId ? `?account=${encodeURIComponent(currentAccountId)}` : "";
-}
-
-function escapeHtml(value) {
-  const div = document.createElement("div");
-  div.textContent = value ?? "";
-  return div.innerHTML;
+function esc(v) {
+  const d = document.createElement("div");
+  d.textContent = v ?? "";
+  return d.innerHTML;
 }
 
 async function api(path, options) {
-  const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || `Erreur ${response.status}`);
-  }
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
   return data;
+}
+
+function accountQuery() {
+  return currentAccountId ? `?account=${encodeURIComponent(currentAccountId)}` : "";
 }
 
 // --- Comptes -----------------------------------------------------------------
@@ -53,285 +27,13 @@ async function loadAccounts() {
     const data = await api("/api/accounts");
     const accounts = data.accounts || [];
     currentAccountId = data.defaultId || (accounts[0] && accounts[0].id) || null;
-
-    if (accounts.length > 1) {
-      els.accountSelect.innerHTML = accounts
-        .map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.label)}</option>`)
-        .join("");
-      els.accountSelect.value = currentAccountId;
-      els.accountSelect.hidden = false;
-    } else {
-      els.accountSelect.hidden = true;
-    }
-    // Mode géré (comptes via config) → pas de re-login depuis l'UI.
-    els.switchAccount.hidden = Boolean(data.managed);
-  } catch {
-    els.accountSelect.hidden = true;
-  }
-}
-
-function onAccountChange() {
-  currentAccountId = els.accountSelect.value;
-  // Réinitialise l'aperçu (il dépend du compte) et rafraîchit statut/IP.
-  previewLoaded = false;
-  els.preview.hidden = true;
-  refreshActionState();
-  loadStatus();
-  loadIp();
-}
-
-// --- Statut de connexion -----------------------------------------------------
-async function loadStatus() {
-  try {
-    const data = await api(`/api/status${accountQuery()}`);
-    if (data.switching) {
-      els.status.textContent = "Changement de compte… connecte-toi dans la fenêtre";
-      els.status.className = "status status--unknown";
-    } else if (data.pending && !data.loggedIn) {
-      els.status.textContent = "Connexion en cours…";
-      els.status.className = "status status--unknown";
-      els.status.title = "";
-    } else if (data.loggedIn) {
-      els.status.textContent = `Connecté : u/${data.user}`;
-      els.status.className = "status status--ok";
-      els.status.title = "";
-    } else {
-      // Affiche la raison directement (plus besoin de survoler).
-      const reason = (data.loginError || data.error || "").split("\n")[0];
-      els.status.textContent = reason ? `Non connecté — ${reason.slice(0, 80)}` : "Non connecté";
-      els.status.className = "status status--err";
-      els.status.title = data.loginError || data.error || "";
-    }
-  } catch {
-    els.status.textContent = "Statut indisponible";
-    els.status.className = "status status--err";
-  }
-}
-
-async function loadIp() {
-  els.egress.textContent = "IP : …";
-  try {
-    const data = await api(`/api/ip${accountQuery()}`);
-    els.egress.textContent = data.ip ? `IP de sortie : ${data.ip}` : "IP : —";
-    els.egress.title = data.ip ? "" : data.error || "";
-  } catch {
-    els.egress.textContent = "";
-  }
-}
-
-async function switchAccount() {
-  if (!confirm("Se déconnecter du compte actuel et ouvrir une fenêtre pour se connecter à un autre compte ?")) {
-    return;
-  }
-  els.switchAccount.disabled = true;
-  els.switchAccount.textContent = "Ouverture…";
-  try {
-    await api("/api/switch-account", { method: "POST" });
-    // Sonde le statut jusqu'à reconnexion (la fenêtre de login est ouverte).
-    const poll = setInterval(async () => {
-      await loadStatus();
-      const data = await api("/api/status").catch(() => null);
-      if (data && !data.switching) clearInterval(poll);
-    }, 3000);
-  } catch (error) {
-    alert(`Erreur : ${error.message}`);
-  } finally {
-    els.switchAccount.disabled = false;
-    els.switchAccount.textContent = "Changer de compte";
-  }
-}
-
-// --- Aperçu du fil -----------------------------------------------------------
-async function loadPreview() {
-  const url = els.url.value.trim();
-  els.previewError.hidden = true;
-  els.preview.hidden = true;
-  previewLoaded = false;
-  refreshActionState();
-
-  if (!url) return;
-
-  els.loadPreview.disabled = true;
-  els.loadPreview.textContent = "Chargement…";
-  try {
-    const p = await api("/api/preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, accountId: currentAccountId }),
-    });
-
-    let html = `<h3>${escapeHtml(p.post.title)}</h3>`;
-    html += `<div class="sub">${escapeHtml(p.subreddit)} · u/${escapeHtml(p.post.author)} · ${p.post.score} pts · réponse à ${p.target.type === "comment" ? "un commentaire" : "le post"}</div>`;
-    if (p.post.body) html += `<div class="body">${escapeHtml(p.post.body)}</div>`;
-    if (p.comment) {
-      html += `<div class="target"><strong>u/${escapeHtml(p.comment.author)}</strong> · ${p.comment.score} pts<br>${escapeHtml(p.comment.body)}</div>`;
-    }
-    els.preview.innerHTML = html;
-    els.preview.hidden = false;
-    previewLoaded = true;
-  } catch (error) {
-    els.previewError.textContent = error.message;
-    els.previewError.hidden = false;
-  } finally {
-    els.loadPreview.disabled = false;
-    els.loadPreview.textContent = "Charger l'aperçu";
-    refreshActionState();
-  }
-}
-
-// --- État des boutons d'action ----------------------------------------------
-function baseReady() {
-  return previewLoaded && els.reviewed.checked && els.text.value.trim().length > 0;
-}
-
-function refreshActionState() {
-  els.publish.disabled = !baseReady();
-  els.scheduleBtn.disabled = !(baseReady() && els.sendAt.value.length > 0);
-}
-
-// --- Publication immédiate ---------------------------------------------------
-async function publish() {
-  const url = els.url.value.trim();
-  const text = els.text.value.trim();
-  els.result.hidden = true;
-  els.publish.disabled = true;
-  els.publish.textContent = "Publication…";
-
-  try {
-    await api("/api/reply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, text, accountId: currentAccountId }),
-    });
-    showResult(true, "✅ Réponse publiée.");
-    resetForm();
-    await loadHistory();
-  } catch (error) {
-    showResult(false, `❌ Échec : ${error.message}`);
-    await loadHistory();
-  } finally {
-    els.publish.textContent = "Publier maintenant";
-    refreshActionState();
-  }
-}
-
-// --- Programmation -----------------------------------------------------------
-async function schedule() {
-  const url = els.url.value.trim();
-  const text = els.text.value.trim();
-  const localValue = els.sendAt.value;
-  if (!localValue) return;
-  const sendAt = new Date(localValue).toISOString();
-
-  els.result.hidden = true;
-  els.scheduleBtn.disabled = true;
-  els.scheduleBtn.textContent = "Programmation…";
-
-  try {
-    await api("/api/schedule", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, text, sendAt, accountId: currentAccountId }),
-    });
-    showResult(true, `🕒 Envoi programmé pour le ${new Date(sendAt).toLocaleString("fr-FR")}.`);
-    resetForm();
-    await loadSchedule();
-  } catch (error) {
-    showResult(false, `❌ Échec : ${error.message}`);
-  } finally {
-    els.scheduleBtn.textContent = "Programmer l'envoi";
-    refreshActionState();
-  }
-}
-
-function showResult(ok, message) {
-  els.result.className = ok ? "result result--ok" : "result result--err";
-  els.result.textContent = message;
-  els.result.hidden = false;
-}
-
-function resetForm() {
-  els.text.value = "";
-  els.reviewed.checked = false;
-  els.sendAt.value = "";
-  updateCharCount();
-}
-
-// --- Historique --------------------------------------------------------------
-async function loadHistory() {
-  try {
-    const entries = await api("/api/history");
-    els.historyBody.innerHTML = entries
-      .map((e) => {
-        const date = new Date(e.timestamp).toLocaleString("fr-FR");
-        const badge =
-          e.status === "success"
-            ? '<span class="badge badge--ok">publié</span>'
-            : '<span class="badge badge--err">échec</span>';
-        const shot = e.screenshotFile
-          ? `<a href="/screenshots/${encodeURIComponent(e.screenshotFile)}" target="_blank">voir</a>`
-          : "—";
-        const title = e.error ? ` title="${escapeHtml(e.error)}"` : "";
-        return `<tr${title}>
-          <td>${escapeHtml(date)}</td>
-          <td>${escapeHtml(e.accountLabel || "—")}</td>
-          <td>${e.type === "comment" ? "commentaire" : "post"}</td>
-          <td><a href="${escapeHtml(e.targetUrl)}" target="_blank">lien</a></td>
-          <td>${badge}</td>
-          <td>${shot}</td>
-        </tr>`;
-      })
+    $("accountSelect").innerHTML = accounts
+      .map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`)
       .join("");
+    if (currentAccountId) $("accountSelect").value = currentAccountId;
   } catch {
-    /* silencieux */
+    /* ignore */
   }
-}
-
-// --- Envois programmés -------------------------------------------------------
-async function loadSchedule() {
-  try {
-    const items = await api("/api/schedule");
-    els.scheduleBody.innerHTML = items
-      .map((item) => {
-        const due = new Date(item.sendAt).toLocaleString("fr-FR");
-        let badge;
-        if (item.status === "pending") badge = '<span class="badge badge--pending">en attente</span>';
-        else if (item.status === "sent") badge = '<span class="badge badge--ok">envoyé</span>';
-        else badge = '<span class="badge badge--err">échec</span>';
-
-        const target = item.targetUrl || item.url;
-        const cancel =
-          item.status === "pending"
-            ? `<button type="button" class="link-danger" data-cancel="${escapeHtml(item.id)}">annuler</button>`
-            : "—";
-        const title = item.error ? ` title="${escapeHtml(item.error)}"` : "";
-        return `<tr${title}>
-          <td>${escapeHtml(due)}</td>
-          <td>${escapeHtml(item.accountLabel || "—")}</td>
-          <td>${item.type === "comment" ? "commentaire" : "post"}</td>
-          <td><a href="${escapeHtml(target)}" target="_blank">lien</a></td>
-          <td>${badge}</td>
-          <td>${cancel}</td>
-        </tr>`;
-      })
-      .join("");
-  } catch {
-    /* silencieux */
-  }
-}
-
-async function cancelSchedule(id) {
-  try {
-    await api(`/api/schedule/${encodeURIComponent(id)}`, { method: "DELETE" });
-    await loadSchedule();
-  } catch (error) {
-    alert(`Erreur : ${error.message}`);
-  }
-}
-
-function updateCharCount() {
-  const n = els.text.value.length;
-  els.charCount.textContent = `${n} caractère${n > 1 ? "s" : ""}`;
 }
 
 // --- Onglets -----------------------------------------------------------------
@@ -339,43 +41,232 @@ document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     const target = tab.getAttribute("data-tab");
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t === tab));
-    document.querySelectorAll(".tab-panel").forEach((panel) => {
-      panel.hidden = panel.id !== `tab-${target}`;
+    document.querySelectorAll(".tab-panel").forEach((p) => {
+      p.hidden = p.id !== `tab-${target}`;
     });
+    if (target === "drafts") loadDrafts();
   });
 });
 
-// --- Évènements --------------------------------------------------------------
-els.accountSelect.addEventListener("change", onAccountChange);
-els.switchAccount.addEventListener("click", switchAccount);
-els.loadPreview.addEventListener("click", loadPreview);
-els.url.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") loadPreview();
-});
-els.text.addEventListener("input", () => {
-  updateCharCount();
-  refreshActionState();
-});
-els.reviewed.addEventListener("change", refreshActionState);
-els.sendAt.addEventListener("input", refreshActionState);
-els.publish.addEventListener("click", publish);
-els.scheduleBtn.addEventListener("click", schedule);
-els.refreshHistory.addEventListener("click", loadHistory);
-els.refreshSchedule.addEventListener("click", loadSchedule);
-els.scheduleBody.addEventListener("click", (e) => {
-  const id = e.target?.getAttribute?.("data-cancel");
-  if (id) cancelSchedule(id);
+// --- Recommandations ---------------------------------------------------------
+async function loadReco() {
+  $("loadReco").disabled = true;
+  $("recoStatus").textContent = "Analyse des subreddits en cours… (~20-40 s)";
+  $("recoList").innerHTML = "";
+  try {
+    const data = await api(`/api/recommendations${accountQuery()}`);
+    const recos = data.recommendations || [];
+    $("recoStatus").textContent = recos.length
+      ? `${recos.length} threads recommandés.`
+      : "Aucun thread ne correspond pour l'instant — réessaie plus tard.";
+    $("recoList").innerHTML = recos.map(recoCard).join("");
+  } catch (e) {
+    $("recoStatus").textContent = `Erreur : ${e.message}`;
+  } finally {
+    $("loadReco").disabled = false;
+  }
+}
+
+function recoCard(r) {
+  const chips = (r.reasons || []).map((x) => `<span class="chip">${esc(x)}</span>`).join("");
+  return `<div class="reco">
+    <div class="reco-main">
+      <a class="reco-title" href="${esc(r.permalink)}" target="_blank">${esc(r.title)}</a>
+      <div class="reco-meta">r/${esc(r.subreddit)} · ${r.ageHours}h · ${r.commentsCount} comm. · ${r.score} pts ${chips}</div>
+    </div>
+    <button class="btn btn-primary btn-sm" data-prepare='${esc(JSON.stringify({ url: r.permalink, title: r.title, subreddit: r.subreddit }))}'>Préparer une réponse</button>
+  </div>`;
+}
+
+$("recoList").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-prepare]");
+  if (btn) openComposer(JSON.parse(btn.getAttribute("data-prepare")));
 });
 
-// --- Init --------------------------------------------------------------------
-// Charge d'abord les comptes (définit currentAccountId), puis le reste.
-loadAccounts().then(() => {
-  loadStatus();
-  loadIp();
+// --- Composeur ---------------------------------------------------------------
+function openComposer(ctx) {
+  composerState = ctx || {};
+  $("composerUrl").value = composerState.url || "";
+  $("composerText").value = "";
+  $("composerError").hidden = true;
+  updateComposerCount();
+  $("composerContext").innerHTML = composerState.title
+    ? `<div class="reco-title">${esc(composerState.title)}</div><div class="reco-meta">r/${esc(composerState.subreddit || "")}</div>`
+    : `<div class="muted-p">Réponse manuelle — colle l'URL du post/commentaire ci-dessous.</div>`;
+  $("composer").hidden = false;
+}
+function closeComposer() {
+  $("composer").hidden = true;
+}
+function updateComposerCount() {
+  const n = $("composerText").value.length;
+  $("composerCount").textContent = `${n} caractère${n > 1 ? "s" : ""}`;
+}
+
+async function aiDraft() {
+  $("aiDraft").disabled = true;
+  $("aiDraft").textContent = "Génération…";
+  $("composerError").hidden = true;
+  try {
+    const data = await api("/api/draft-reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: composerState.title || "(post Reddit)",
+        subreddit: composerState.subreddit || "AskReddit",
+        body: composerState.body || "",
+      }),
+    });
+    $("composerText").value = data.text || "";
+    updateComposerCount();
+  } catch (e) {
+    showComposerError(e.message);
+  } finally {
+    $("aiDraft").disabled = false;
+    $("aiDraft").textContent = "✨ Brouillon IA (Gemini)";
+  }
+}
+
+async function saveDraft() {
+  const url = $("composerUrl").value.trim();
+  const text = $("composerText").value.trim();
+  if (!url || !text) {
+    showComposerError("URL et texte requis.");
+    return;
+  }
+  $("composerSave").disabled = true;
+  try {
+    let subreddit = composerState.subreddit;
+    if (!subreddit) {
+      const m = url.match(/\/r\/([^/]+)\//);
+      subreddit = m ? m[1] : "reddit";
+    }
+    await api("/api/drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accountId: currentAccountId,
+        targetUrl: url,
+        title: composerState.title || "Réponse manuelle",
+        subreddit,
+        text,
+        source: composerState.title ? "generic" : "manual",
+      }),
+    });
+    closeComposer();
+    // Bascule sur l'onglet Brouillons.
+    document.querySelector('.tab[data-tab="drafts"]').click();
+  } catch (e) {
+    showComposerError(e.message);
+  } finally {
+    $("composerSave").disabled = false;
+  }
+}
+
+function showComposerError(msg) {
+  $("composerError").textContent = msg;
+  $("composerError").hidden = false;
+}
+
+// --- Brouillons --------------------------------------------------------------
+async function loadDrafts() {
+  try {
+    const all = await api("/api/drafts");
+    const items = all.filter((d) => !currentAccountId || d.accountId === currentAccountId);
+    $("draftsList").innerHTML = items.length
+      ? items.map(draftRow).join("")
+      : '<p class="muted-p">Aucun brouillon pour ce compte.</p>';
+  } catch {
+    /* ignore */
+  }
+}
+
+function draftRow(d) {
+  const badge = d.status === "posted"
+    ? '<span class="badge badge--ok">publié</span>'
+    : '<span class="badge badge--pending">à publier</span>';
+  return `<div class="draft" data-id="${esc(d.id)}">
+    <div class="draft-head">
+      <a class="reco-title" href="${esc(d.targetUrl)}" target="_blank">${esc(d.title)}</a>
+      <div class="reco-meta">r/${esc(d.subreddit)} · ${esc(d.accountLabel)} ${badge}</div>
+    </div>
+    <div class="draft-text">${esc(d.text)}</div>
+    <div class="draft-actions">
+      <button class="btn btn-ghost btn-sm" data-act="copy">Copier la réponse</button>
+      <a class="btn btn-ghost btn-sm" href="${esc(d.targetUrl)}" target="_blank">Ouvrir le post</a>
+      ${d.status === "posted" ? "" : '<button class="btn btn-primary btn-sm" data-act="posted">Marquer publié</button>'}
+      <button class="btn-link-danger" data-act="delete">Supprimer</button>
+    </div>
+  </div>`;
+}
+
+$("draftsList").addEventListener("click", async (e) => {
+  const actEl = e.target.closest("[data-act]");
+  if (!actEl) return;
+  const row = e.target.closest(".draft");
+  const id = row.getAttribute("data-id");
+  const act = actEl.getAttribute("data-act");
+  if (act === "copy") {
+    const text = row.querySelector(".draft-text").textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      actEl.textContent = "Copié ✓";
+      setTimeout(() => (actEl.textContent = "Copier la réponse"), 1500);
+    });
+  } else if (act === "posted") {
+    await api(`/api/drafts/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "posted" }),
+    }).catch(() => {});
+    loadDrafts();
+  } else if (act === "delete") {
+    if (confirm("Supprimer ce brouillon ?")) {
+      await api(`/api/drafts/${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
+      loadDrafts();
+    }
+  }
 });
-loadHistory();
-loadSchedule();
-updateCharCount();
-// Rafraîchit périodiquement statut et envois programmés.
-setInterval(loadStatus, 15000);
-setInterval(loadSchedule, 20000);
+
+// --- Publié ------------------------------------------------------------------
+async function loadPublished() {
+  const user = $("pubUser").value.trim();
+  if (!user) return;
+  $("publishedList").innerHTML = '<p class="muted-p">Chargement…</p>';
+  try {
+    const data = await api(`/api/published${accountQuery()}&user=${encodeURIComponent(user)}`);
+    const items = data.comments || [];
+    $("publishedList").innerHTML = items.length
+      ? items
+          .map(
+            (c) => `<div class="draft">
+              <div class="reco-meta">r/${esc(c.subreddit)}</div>
+              <div class="draft-text">${esc(c.body)}</div>
+              <div class="draft-actions"><a class="btn btn-ghost btn-sm" href="${esc(c.permalink)}" target="_blank">Voir sur Reddit</a></div>
+            </div>`,
+          )
+          .join("")
+      : '<p class="muted-p">Aucun commentaire public trouvé (compte neuf, contenu filtré, ou pseudo erroné).</p>';
+  } catch (e) {
+    $("publishedList").innerHTML = `<p class="error">${esc(e.message)}</p>`;
+  }
+}
+
+// --- Évènements --------------------------------------------------------------
+$("accountSelect").addEventListener("change", () => {
+  currentAccountId = $("accountSelect").value;
+  $("recoList").innerHTML = "";
+  $("recoStatus").textContent = "";
+  loadDrafts();
+});
+$("loadReco").addEventListener("click", loadReco);
+$("newManual").addEventListener("click", () => openComposer(null));
+$("composerClose").addEventListener("click", closeComposer);
+$("composerCancel").addEventListener("click", closeComposer);
+$("aiDraft").addEventListener("click", aiDraft);
+$("composerSave").addEventListener("click", saveDraft);
+$("composerText").addEventListener("input", updateComposerCount);
+$("refreshDrafts").addEventListener("click", loadDrafts);
+$("loadPublished").addEventListener("click", loadPublished);
+
+// --- Init --------------------------------------------------------------------
+loadAccounts();

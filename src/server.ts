@@ -11,9 +11,20 @@ import {
   PUBLIC_DIR,
   SCREENSHOTS_DIR,
 } from "./config.js";
-import { previewInput, replyInput, scheduleInput } from "./schemas.js";
+import {
+  draftCreateInput,
+  draftReplyInput,
+  draftUpdateInput,
+  previewInput,
+  replyInput,
+  scheduleInput,
+} from "./schemas.js";
 import { fetchPreview } from "./reddit/preview.js";
 import { getEgressIp } from "./reddit/browser.js";
+import { fetchUserComments } from "./reddit/read.js";
+import { recommendGeneric } from "./recommend/recommend.js";
+import { draftReply } from "./gemini.js";
+import { addDraft, readDrafts, removeDraft, updateDraft } from "./drafts/store.js";
 import { postReply } from "./reddit/poster.js";
 import { parseRedditUrl } from "./reddit/url.js";
 import {
@@ -214,7 +225,89 @@ app.delete<{ Params: { id: string } }>("/api/schedule/:id", async (request, repl
   return { ok: true };
 });
 
-/** Historique des réponses publiées. */
+/** Recommandations de threads génériques (lecture via proxy, sans login). */
+app.get<{ Querystring: { account?: string } }>("/api/recommendations", async (request, reply) => {
+  const accountId = request.query.account ?? defaultAccountId();
+  try {
+    const recos = await withAccount(accountId, (context) => recommendGeneric(context));
+    return { recommendations: recos, accountId };
+  } catch (error) {
+    return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/** Activité publiée par un compte (lecture via proxy). ?user=<pseudo Reddit>. */
+app.get<{ Querystring: { account?: string; user?: string } }>("/api/published", async (request, reply) => {
+  const accountId = request.query.account ?? defaultAccountId();
+  const user = request.query.user;
+  if (!user) return reply.code(400).send({ error: "Paramètre ?user=<pseudo Reddit> requis." });
+  try {
+    const comments = await withAccount(accountId, (context) => fetchUserComments(context, user));
+    return { comments, user, accountId };
+  } catch (error) {
+    return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/** Brouillon de réponse assisté par Gemini. */
+app.post("/api/draft-reply", async (request, reply) => {
+  const parsed = draftReplyInput.safeParse(request.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Entrée invalide" });
+  }
+  try {
+    const text = await draftReply(parsed.data);
+    return { text };
+  } catch (error) {
+    return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/** File de brouillons (réponses préparées, publiées par un humain). */
+app.get("/api/drafts", async () => {
+  return readDrafts();
+});
+
+app.post("/api/drafts", async (request, reply) => {
+  const parsed = draftCreateInput.safeParse(request.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Entrée invalide" });
+  }
+  const id = parsed.data.accountId ?? defaultAccountId();
+  const draft = await addDraft(
+    {
+      accountId: id,
+      accountLabel: getAccount(id)?.label ?? id,
+      targetUrl: parsed.data.targetUrl,
+      title: parsed.data.title,
+      subreddit: parsed.data.subreddit,
+      text: parsed.data.text,
+      source: parsed.data.source,
+    },
+    new Date().toISOString(),
+  );
+  return draft;
+});
+
+app.patch<{ Params: { id: string } }>("/api/drafts/:id", async (request, reply) => {
+  const parsed = draftUpdateInput.safeParse(request.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Entrée invalide" });
+  }
+  const patch: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.status === "posted") patch.postedAt = new Date().toISOString();
+  const updated = await updateDraft(request.params.id, patch);
+  if (!updated) return reply.code(404).send({ error: "Brouillon introuvable" });
+  return updated;
+});
+
+app.delete<{ Params: { id: string } }>("/api/drafts/:id", async (request, reply) => {
+  const removed = await removeDraft(request.params.id);
+  if (!removed) return reply.code(404).send({ error: "Brouillon introuvable" });
+  return { ok: true };
+});
+
+/** Historique des réponses publiées (legacy, automatisation). */
 app.get("/api/history", async () => {
   return readHistory();
 });

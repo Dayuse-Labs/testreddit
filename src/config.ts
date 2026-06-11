@@ -72,6 +72,13 @@ export const LOCAL_MODE =
 /** Fichier local (gitignoré) listant les comptes en préparation pour build-accounts. */
 export const ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.local.json");
 
+/** Clé API Gemini (Google) pour les brouillons de réponse. À mettre en variable d'env. */
+export const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+
+/** Fichier JSON de la file de brouillons (réponses préparées, publiées par un humain). */
+export const DRAFTS_FILE = path.join(DATA_DIR, "drafts.json");
+
 /**
  * Protection optionnelle par Basic Auth. Si APP_PASSWORD est défini, toutes les
  * routes l'exigent (indispensable dès que l'outil est exposé sur Internet).

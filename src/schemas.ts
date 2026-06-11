@@ -79,6 +79,30 @@ export const scheduleInput = replyInput.extend({
     ),
 });
 
+export const draftReplyInput = z.object({
+  title: z.string().trim().min(1),
+  subreddit: z.string().trim().min(1),
+  body: z.string().optional(),
+  targetComment: z.string().optional(),
+  tone: z.string().optional(),
+  length: z.string().optional(),
+  guidance: z.string().optional(),
+});
+
+export const draftCreateInput = z.object({
+  accountId,
+  targetUrl: redditUrl,
+  title: z.string().trim().min(1),
+  subreddit: z.string().trim().min(1),
+  text: z.string().trim().min(1),
+  source: z.enum(["generic", "dayuse", "manual"]).default("manual"),
+});
+
+export const draftUpdateInput = z.object({
+  text: z.string().trim().min(1).optional(),
+  status: z.enum(["todo", "posted"]).optional(),
+});
+
 export type Account = z.infer<typeof accountSchema>;
 export type ProxyConfig = z.infer<typeof proxyConfigSchema>;
 export type Credentials = z.infer<typeof credentialsSchema>;

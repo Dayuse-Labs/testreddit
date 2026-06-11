@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Réponses Reddit — Dayuse</title>
+    <title>Assistant Reddit — Dayuse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,217 +16,104 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-dot"></span>
-        <span class="brand-name">Réponses Reddit</span>
+        <span class="brand-name">Assistant Reddit</span>
         <span class="brand-by">by Dayuse</span>
       </div>
       <div class="topbar-right">
-        <select id="accountSelect" class="account-select" hidden></select>
-        <span id="egress" class="egress"></span>
-        <div id="status" class="status status--unknown">Vérification…</div>
-        <button id="switchAccount" type="button" class="btn btn-ghost btn-sm">Changer de compte</button>
+        <label class="account-label" for="accountSelect">Compte</label>
+        <select id="accountSelect" class="account-select"></select>
       </div>
     </header>
 
     <nav class="tabs">
-      <button class="tab is-active" data-tab="tool" type="button">Réponses</button>
+      <button class="tab is-active" data-tab="reco" type="button">Recommandations</button>
+      <button class="tab" data-tab="drafts" type="button">Brouillons</button>
+      <button class="tab" data-tab="published" type="button">Publié</button>
       <button class="tab" data-tab="doc" type="button">Documentation</button>
     </nav>
 
     <main>
-      <!-- ============ ONGLET OUTIL ============ -->
-      <section id="tab-tool" class="tab-panel">
+      <!-- ===== RECOMMANDATIONS ===== -->
+      <section id="tab-reco" class="tab-panel">
         <div class="card">
-          <h2>1. Cible</h2>
-          <label for="url">URL du post ou du commentaire Reddit</label>
-          <div class="row">
-            <input
-              id="url"
-              type="url"
-              placeholder="https://www.reddit.com/r/.../comments/..."
-              autocomplete="off"
-            />
-            <button id="loadPreview" type="button" class="btn btn-primary">Charger l'aperçu</button>
-          </div>
-          <div id="previewError" class="error" hidden></div>
-          <div id="preview" class="preview" hidden></div>
-        </div>
-
-        <div class="card">
-          <h2>2. Réponse</h2>
-          <label for="text">Texte de la réponse (relis l'orthographe avant d'envoyer)</label>
-          <textarea id="text" rows="8" placeholder="Votre réponse…"></textarea>
-          <div class="meta">
-            <span id="charCount">0 caractère</span>
-          </div>
-          <label class="checkbox">
-            <input id="reviewed" type="checkbox" />
-            J'ai relu l'orthographe et le contenu
-          </label>
-
-          <div class="actions">
-            <button id="publish" type="button" class="btn btn-primary" disabled>Publier maintenant</button>
-            <div class="schedule-inline">
-              <input id="sendAt" type="datetime-local" />
-              <button id="scheduleBtn" type="button" class="btn btn-ghost" disabled>Programmer l'envoi</button>
+          <div class="card-head">
+            <h2>Threads à valeur ajoutée (US)</h2>
+            <div class="row-actions">
+              <button id="newManual" type="button" class="btn btn-ghost btn-sm">Réponse manuelle</button>
+              <button id="loadReco" type="button" class="btn btn-primary btn-sm">Charger les recommandations</button>
             </div>
           </div>
-          <div id="result" class="result" hidden></div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <h2>Envois programmés</h2>
-            <button id="refreshSchedule" type="button" class="btn btn-ghost btn-sm">Rafraîchir</button>
-          </div>
-          <table id="schedule">
-            <thead>
-              <tr>
-                <th>Prévu pour</th>
-                <th>Compte</th>
-                <th>Type</th>
-                <th>Cible</th>
-                <th>Statut</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <h2>Historique</h2>
-            <button id="refreshHistory" type="button" class="btn btn-ghost btn-sm">Rafraîchir</button>
-          </div>
-          <table id="history">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Compte</th>
-                <th>Type</th>
-                <th>Cible</th>
-                <th>Statut</th>
-                <th>Capture</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <p class="muted-p">Fils récents, actifs et non polémiques où une réponse utile a sa place. Choisis-en un, prépare la réponse, un humain publiera.</p>
+          <div id="recoStatus" class="muted-p"></div>
+          <div id="recoList" class="reco-list"></div>
         </div>
       </section>
 
-      <!-- ============ ONGLET DOCUMENTATION ============ -->
+      <!-- ===== BROUILLONS ===== -->
+      <section id="tab-drafts" class="tab-panel" hidden>
+        <div class="card">
+          <div class="card-head">
+            <h2>Brouillons à publier</h2>
+            <button id="refreshDrafts" type="button" class="btn btn-ghost btn-sm">Rafraîchir</button>
+          </div>
+          <p class="muted-p">Copie la réponse, ouvre le post sur Reddit, publie à la main, puis marque comme publié.</p>
+          <div id="draftsList" class="drafts-list"></div>
+        </div>
+      </section>
+
+      <!-- ===== PUBLIÉ ===== -->
+      <section id="tab-published" class="tab-panel" hidden>
+        <div class="card">
+          <h2>Activité publiée du compte</h2>
+          <label for="pubUser">Pseudo Reddit du compte</label>
+          <div class="row">
+            <input id="pubUser" type="text" placeholder="ex. AblePosition9803" autocomplete="off" />
+            <button id="loadPublished" type="button" class="btn btn-primary">Charger</button>
+          </div>
+          <div id="publishedList" class="drafts-list"></div>
+        </div>
+      </section>
+
+      <!-- ===== DOCUMENTATION ===== -->
       <section id="tab-doc" class="tab-panel doc" hidden>
         <div class="card">
-          <h2>À quoi sert cet outil</h2>
-          <p>
-            Cet outil permet de <strong>répondre à des posts et commentaires Reddit</strong> depuis
-            un ou plusieurs comptes d'entreprise, en relisant le contenu avant publication. Chaque
-            réponse est journalisée, et on peut programmer des envois à l'avance.
-          </p>
-          <ul>
-            <li><strong>Aperçu</strong> du fil ciblé pour vérifier le contexte et l'orthographe.</li>
-            <li><strong>Publication immédiate</strong> ou <strong>programmée</strong>.</li>
-            <li><strong>Plusieurs comptes</strong> (un par marché), chacun avec son IP résidentielle.</li>
-            <li><strong>Historique</strong> avec capture d'écran de chaque réponse.</li>
-          </ul>
-        </div>
-
-        <div class="card">
-          <h2>Répondre à un post ou un commentaire</h2>
+          <h2>Comment utiliser l'assistant</h2>
           <ol>
-            <li>Colle l'<strong>URL d'un post</strong> (elle contient <code>/comments/...</code>) ou le
-              <strong>permalien d'un commentaire</strong> (bouton « Share » → « Copy link »).</li>
-            <li>Clique <strong>Charger l'aperçu</strong> pour vérifier le fil ciblé.</li>
-            <li>Écris ta réponse, relis, coche <strong>« J'ai relu »</strong>.</li>
-            <li><strong>Publier maintenant</strong>, ou choisis une date puis <strong>Programmer l'envoi</strong>.</li>
+            <li>Choisis le <strong>compte</strong> (marché) en haut à droite.</li>
+            <li>Onglet <strong>Recommandations</strong> → <em>Charger</em> : l'outil propose des threads US actifs, non polémiques, à valeur ajoutée.</li>
+            <li>Sur un thread, clique <strong>Préparer une réponse</strong> → génère un <strong>brouillon IA (Gemini)</strong>, édite-le, relis l'orthographe.</li>
+            <li><strong>Enregistre le brouillon</strong> → il part dans l'onglet <strong>Brouillons</strong>.</li>
+            <li>Onglet <strong>Brouillons</strong> → <em>Copier la réponse</em> + <em>Ouvrir le post</em> → un <strong>humain publie</strong> à la main, puis <em>Marquer publié</em>.</li>
+            <li>Onglet <strong>Publié</strong> → vérifie l'activité du compte (saisis son pseudo Reddit).</li>
           </ol>
-          <p class="note">
-            ⚠️ Une URL de subreddit seule (ex. <code>reddit.com/r/test/</code>) ne fonctionne pas :
-            il faut l'URL d'un <strong>post précis</strong>.
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Choisir le compte (multi-marchés)</h2>
-          <p>
-            Quand plusieurs comptes sont configurés, un <strong>menu déroulant</strong> apparaît en
-            haut à droite. Le compte sélectionné est utilisé pour l'aperçu, la publication et la
-            programmation. L'<strong>IP de sortie</strong> affichée correspond au proxy résidentiel
-            de ce compte.
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Reconnexion automatique</h2>
-          <p>
-            L'outil stocke les <strong>identifiants</strong> de chaque compte et <strong>se
-            reconnecte tout seul</strong> dès que la session Reddit tombe — plus besoin de
-            re-générer une session à la main. Limites : la <strong>2FA par application</strong> est
-            gérée si tu fournis le secret TOTP ; la <strong>2FA par SMS</strong> doit être désactivée,
-            et un éventuel <strong>CAPTCHA</strong> au login bloque la reconnexion auto (le proxy
-            résidentiel réduit fortement ce risque).
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Ajouter un nouveau compte</h2>
-          <p>Pour chaque marché, enregistre le compte avec ses identifiants et son proxy dédié :</p>
-          <pre><code>cd ~/Desktop/flat
-
-# 1. Enregistrer le compte (identifiants + proxy géolocalisé)
-npm run add-account -- --label "France" \
-  --user PSEUDO_REDDIT --pass MOT_DE_PASSE [--totp SECRET_2FA] \
-  --proxy-server http://gate.decodo.com:10003 \
-  --proxy-user user-XXXX-country-fr-session-fr1-sessionduration-1440 \
-  --proxy-pass MOT_DE_PASSE_PROXY
-
-# 2. Générer la configuration
-npm run build-accounts   # → écrit data/ACCOUNTS_B64.txt</code></pre>
-          <p>
-            Recommence pour chaque marché en adaptant le <strong>pays du proxy</strong>
-            (<code>country-fr</code>, <code>country-de</code>…) et un <strong>jeton de session</strong>
-            unique (<code>session-fr1</code>, <code>session-de1</code>…) pour une IP stable.
-          </p>
-          <p>
-            Ouvre <code>data/ACCOUNTS_B64.txt</code>, copie son contenu et colle-le dans la variable
-            <strong><code>ACCOUNTS_B64</code></strong> de Railway. Redéploie : le compte apparaît
-            dans le menu déroulant.
-          </p>
-          <p class="note">
-            🔒 Ce contenu contient les identifiants Reddit et proxy. Ne le partage jamais dans un
-            chat ou un message.
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Déploiement (Railway)</h2>
-          <p>Variables d'environnement à définir sur le service Railway :</p>
-          <table class="doc-table">
-            <thead><tr><th>Variable</th><th>Rôle</th></tr></thead>
-            <tbody>
-              <tr><td><code>ACCOUNTS_B64</code></td><td>Tous les comptes + proxys (via <code>build-accounts</code>). Prioritaire.</td></tr>
-              <tr><td><code>APP_PASSWORD</code></td><td>Mot de passe d'accès à l'interface (obligatoire).</td></tr>
-              <tr><td><code>APP_USER</code></td><td>Identifiant d'accès (défaut <code>admin</code>).</td></tr>
-            </tbody>
-          </table>
-          <p class="note">
-            Quand <code>ACCOUNTS_B64</code> est défini, il remplace <code>REDDIT_SESSION_B64</code>
-            et <code>PROXY_*</code> (compte unique). Sans volume Railway, l'historique et les envois
-            programmés se réinitialisent à chaque redéploiement (les comptes, eux, persistent).
-          </p>
-        </div>
-
-        <div class="card">
-          <h2>Bonnes pratiques & limites</h2>
-          <ul>
-            <li><strong>Géoloc par marché</strong> : un proxy du bon pays par compte réduit le risque de flag « nouvelle localisation ».</li>
-            <li><strong>IP stable</strong> : on utilise une session collante (sticky), pas une rotation à chaque requête — un compte qui saute d'IP est suspect.</li>
-            <li><strong>Volume faible & relu</strong> : chaque réponse est relue manuellement ; éviter le spam protège les comptes.</li>
-            <li><strong>Sessions</strong> : elles expirent — il faudra refaire <code>npm run switch</code> + <code>build-accounts</code> régulièrement.</li>
-          </ul>
+          <p class="note">Publication 100 % humaine : aucun login ni envoi automatique. Voir <code>DECISIONS.md</code> pour le pourquoi.</p>
         </div>
       </section>
     </main>
+
+    <!-- ===== COMPOSEUR (modal) ===== -->
+    <div id="composer" class="modal" hidden>
+      <div class="modal-box">
+        <div class="modal-head">
+          <h3 id="composerTitle">Préparer une réponse</h3>
+          <button id="composerClose" type="button" class="modal-close">×</button>
+        </div>
+        <div id="composerContext" class="composer-context"></div>
+        <label for="composerUrl">URL du post/commentaire</label>
+        <input id="composerUrl" type="url" placeholder="https://www.reddit.com/r/.../comments/..." />
+        <label for="composerText">Réponse</label>
+        <textarea id="composerText" rows="7" placeholder="Écris la réponse, ou génère un brouillon IA…"></textarea>
+        <div class="composer-meta">
+          <span id="composerCount">0 caractère</span>
+          <button id="aiDraft" type="button" class="btn btn-ghost btn-sm">✨ Brouillon IA (Gemini)</button>
+        </div>
+        <div id="composerError" class="error" hidden></div>
+        <div class="modal-actions">
+          <button id="composerCancel" type="button" class="btn btn-ghost">Annuler</button>
+          <button id="composerSave" type="button" class="btn btn-primary">Enregistrer le brouillon</button>
+        </div>
+      </div>
+    </div>
 
     <script src="/app.js"></script>
   </body>
