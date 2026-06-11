@@ -638,6 +638,33 @@ td button.link-danger:hover {
   border: 1px solid #ffe8c2;
 }
 
+.reco-inline {
+  border: 1px solid #ffe8c2;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  background: var(--ai-bg);
+  padding: 12px 16px;
+  margin-top: -8px;
+}
+
+.inline-text {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.inline-text:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
 .draft-head {
   margin-bottom: 8px;
 }

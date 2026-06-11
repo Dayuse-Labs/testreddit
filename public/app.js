@@ -129,6 +129,51 @@ document.querySelectorAll(".tab").forEach((tab) => {
 });
 
 // --- Recommandations ---------------------------------------------------------
+// --- État de connexion -------------------------------------------------------
+async function loadStatus() {
+  const el = $("status");
+  try {
+    const d = await api(`/api/status${accountQuery()}`);
+    if (d.switching) {
+      el.textContent = "Changement…";
+      el.className = "status status--unknown";
+    } else if (d.loggedIn) {
+      el.textContent = `Connecté : u/${d.user}`;
+      el.className = "status status--ok";
+      el.title = "";
+      $("reconnect").hidden = true;
+    } else {
+      el.textContent = "Non connecté";
+      el.className = "status status--err";
+      el.title = d.error || "";
+      $("reconnect").hidden = false;
+    }
+  } catch {
+    el.textContent = "statut indisponible";
+    el.className = "status status--err";
+  }
+}
+
+async function reconnect() {
+  $("reconnect").disabled = true;
+  $("reconnect").textContent = "Reconnexion…";
+  try {
+    const d = await api(`/api/reconnect${accountQuery()}`, { method: "POST" });
+    if (!d.ok) {
+      alert(
+        `Reconnexion échouée : ${d.error || "inconnue"}\n\n` +
+          "Si ça persiste, recapture une session en local : npm run login (puis export-session / variable).",
+      );
+    }
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    $("reconnect").disabled = false;
+    $("reconnect").textContent = "Se reconnecter";
+    loadStatus();
+  }
+}
+
 // Bascule de flux (Générique / Dayuse).
 document.querySelectorAll(".seg").forEach((seg) => {
   seg.addEventListener("click", () => {
@@ -158,7 +203,8 @@ async function loadReco(force) {
     $("recoStatus").textContent = recos.length
       ? `${recos.length} threads · généré le ${when}${data.cached ? " (cache)" : ""}`
       : "Aucun thread ne correspond — clique « Actualiser » (nécessite une session connectée pour le flux Dayuse).";
-    $("recoList").innerHTML = recos.map(recoCard).join("");
+    $("recoList").innerHTML = recos.map((r, i) => recoCard(r, i)).join("");
+    if (recos[0]) autoDraftFirst(recos[0]); // pré-brouillon du 1er thread
   } catch (e) {
     $("recoStatus").textContent = `Erreur : ${e.message}`;
   } finally {
@@ -167,15 +213,93 @@ async function loadReco(force) {
   }
 }
 
-function recoCard(r) {
+function recoCard(r, i) {
   const chips = (r.reasons || []).map((x) => `<span class="chip">${esc(x)}</span>`).join("");
-  return `<div class="reco">
+  const card = `<div class="reco">
     <div class="reco-main">
       <a class="reco-title" href="${esc(r.permalink)}" target="_blank">${esc(r.title)}</a>
       <div class="reco-meta">r/${esc(r.subreddit)} · ${r.ageHours}h · ${r.commentsCount} comm. · ${r.score} pts ${chips}</div>
     </div>
     <button class="btn btn-primary btn-sm" data-prepare='${esc(JSON.stringify({ url: r.permalink, title: r.title, subreddit: r.subreddit }))}'>Préparer une réponse</button>
   </div>`;
+  if (i === 0) {
+    return card + `<div class="reco-inline" id="recoInline0"><span class="muted-p" style="margin:0">✨ Génération du brouillon…</span></div>`;
+  }
+  return card;
+}
+
+// Pré-brouillon automatique du 1er thread (contexte + IA), avec bouton Publier.
+async function autoDraftFirst(r) {
+  const box = $("recoInline0");
+  if (!box) return;
+  try {
+    const sep = accountQuery() ? "&" : "?";
+    const ctx = await api(`/api/thread-context${accountQuery()}${sep}url=${encodeURIComponent(r.permalink)}`).catch(() => ({}));
+    const draft = await api("/api/draft-reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: ctx.title || r.title,
+        subreddit: ctx.subreddit || r.subreddit,
+        body: ctx.body || "",
+        comments: ctx.comments || [],
+      }),
+    });
+    renderInlineDraft(box, r, draft.text || "");
+  } catch (e) {
+    box.innerHTML = `<span class="muted-p" style="margin:0">Brouillon IA indisponible : ${esc(e.message)}</span>`;
+  }
+}
+
+function renderInlineDraft(box, r, text) {
+  box.innerHTML = `<textarea class="inline-text" rows="4"></textarea>
+    <div class="draft-actions">
+      <button class="btn btn-primary btn-sm" data-inline="publish">Publier sur Reddit</button>
+      <button class="btn btn-ghost btn-sm" data-inline="copy">Copier</button>
+      <button class="btn btn-ghost btn-sm" data-inline="save">Enregistrer le brouillon</button>
+      <a class="btn btn-ghost btn-sm" href="${esc(r.permalink)}" target="_blank">Ouvrir le post</a>
+    </div>`;
+  box.querySelector(".inline-text").value = text;
+  box.querySelector('[data-inline="publish"]').onclick = () => inlinePublish(box, r);
+  box.querySelector('[data-inline="copy"]').onclick = (e) => {
+    navigator.clipboard.writeText(box.querySelector(".inline-text").value);
+    e.target.textContent = "Copié ✓";
+    setTimeout(() => (e.target.textContent = "Copier"), 1500);
+  };
+  box.querySelector('[data-inline="save"]').onclick = () => inlineSave(box, r);
+}
+
+async function inlinePublish(box, r) {
+  const text = box.querySelector(".inline-text").value.trim();
+  const btn = box.querySelector('[data-inline="publish"]');
+  btn.disabled = true;
+  btn.textContent = "Publication…";
+  try {
+    await api("/api/reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: r.permalink, text, accountId: currentAccountId }),
+    });
+    box.innerHTML = '<span class="badge badge--ok">publié sur Reddit ✓</span>';
+  } catch (e) {
+    alert(`Échec de publication : ${e.message}\n\nReconnecte le compte (bouton en haut) puis réessaie, ou utilise « Copier » + « Ouvrir le post ».`);
+    btn.disabled = false;
+    btn.textContent = "Publier sur Reddit";
+  }
+}
+
+async function inlineSave(box, r) {
+  const text = box.querySelector(".inline-text").value.trim();
+  try {
+    await api("/api/drafts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId: currentAccountId, targetUrl: r.permalink, title: r.title, subreddit: r.subreddit, text, source: "generic" }),
+    });
+    box.querySelector('[data-inline="save"]').textContent = "Enregistré ✓";
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 $("recoList").addEventListener("click", (e) => {
@@ -417,8 +541,10 @@ $("accountSelect").addEventListener("change", () => {
   currentAccountId = $("accountSelect").value;
   $("recoList").innerHTML = "";
   $("recoStatus").textContent = "";
+  loadStatus();
   loadDrafts();
 });
+$("reconnect").addEventListener("click", reconnect);
 $("loadReco").addEventListener("click", () => loadReco(false));
 $("refreshReco").addEventListener("click", () => loadReco(true));
 $("newManual").addEventListener("click", () => openComposer(null));
@@ -432,4 +558,8 @@ $("loadPublished").addEventListener("click", loadPublished);
 $("acSave").addEventListener("click", addAccount);
 
 // --- Init --------------------------------------------------------------------
-loadAccounts();
+loadAccounts().then(() => {
+  loadStatus();
+  loadReco(false); // charge les recos (cache chaud) sans attendre
+});
+setInterval(loadStatus, 30000);

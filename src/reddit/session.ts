@@ -85,6 +85,12 @@ const lastLoginAttempt = new Map<string, number>();
 const LOGIN_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 4;
 
+/** Réinitialise le cooldown de login (reconnexion forcée depuis l'UI). */
+export function resetLoginCooldown(accountId?: string): void {
+  if (accountId) lastLoginAttempt.delete(accountId);
+  else lastLoginAttempt.clear();
+}
+
 /**
  * Vérifie la connexion ; si déconnecté et que le compte a des identifiants,
  * relance un login automatique. Réessaie avec une IP fraîche tant que l'échec

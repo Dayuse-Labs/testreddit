@@ -20,7 +20,7 @@ import {
   scheduleInput,
 } from "./schemas.js";
 import { fetchPreview, fetchThreadContext } from "./reddit/preview.js";
-import { getEgressIp } from "./reddit/browser.js";
+import { getEgressIp, getLoggedInUser } from "./reddit/browser.js";
 import { fetchUserActivity } from "./reddit/read.js";
 import { recommendDayuse, recommendGeneric } from "./recommend/recommend.js";
 import { getCachedReco, setCachedReco } from "./recommend/cache.js";
@@ -40,9 +40,8 @@ import { accountCreateInput } from "./schemas.js";
 import type { Account } from "./schemas.js";
 import {
   disposeSession,
-  getCachedState,
   isSwitching,
-  refreshLogin,
+  resetLoginCooldown,
   startAccountSwitch,
   withAccount,
   withLoggedInAccount,
@@ -132,26 +131,32 @@ app.delete<{ Params: { id: string } }>("/api/accounts/:id", async (request, repl
   return { ok: true };
 });
 
-/** État de la connexion Reddit pour un compte. */
+/** État de connexion d'un compte : vérification en LECTURE (sans auto-login). */
 app.get<{ Querystring: { account?: string } }>("/api/status", async (request) => {
   if (isSwitching()) {
-    return { loggedIn: false, user: null, headless: HEADLESS, switching: true, remote: !LOCAL_MODE };
+    return { loggedIn: false, user: null, switching: true };
   }
   const accountId = request.query.account ?? defaultAccountId();
-  // Réponse instantanée depuis le cache. On NE déclenche PAS de login ici
-  // (sécurité : évite une tempête de logins échoués qui pourrait verrouiller le
-  // compte). Le login a lieu au démarrage et lors des actions (aperçu/publier).
-  const cached = getCachedState(accountId);
-  return {
-    loggedIn: cached.loggedIn,
-    user: cached.user,
-    accountId,
-    headless: HEADLESS,
-    switching: false,
-    remote: !LOCAL_MODE,
-    pending: cached.pending,
-    ...(cached.error && !cached.loggedIn ? { loginError: cached.error } : {}),
-  };
+  try {
+    const user = await withAccount(accountId, (context) => getLoggedInUser(context));
+    return { loggedIn: user !== null, user, accountId, switching: false };
+  } catch (error) {
+    return {
+      loggedIn: false,
+      user: null,
+      accountId,
+      switching: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+/** Reconnexion forcée depuis le front (réinitialise le cooldown + tente le login). */
+app.post<{ Querystring: { account?: string } }>("/api/reconnect", async (request) => {
+  const accountId = request.query.account ?? defaultAccountId();
+  resetLoginCooldown(accountId);
+  const login = await withLoggedInAccount(accountId, async (_context, result) => result);
+  return { ok: login.ok, user: login.user ?? null, accountId, ...(login.ok ? {} : { error: login.error }) };
 });
 
 /** IP de sortie réellement vue par les sites (diagnostic proxy) pour un compte. */
@@ -406,11 +411,27 @@ async function shutdown(): Promise<void> {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
+/** Pré-charge les deux flux de recommandations en arrière-plan (cache chaud au boot). */
+async function warmRecommendations(): Promise<void> {
+  const accountId = defaultAccountId();
+  for (const stream of ["generic", "dayuse"] as const) {
+    if (await getCachedReco(stream)) continue; // déjà frais
+    try {
+      const recos = await withAccount(accountId, (context) =>
+        stream === "dayuse" ? recommendDayuse(context) : recommendGeneric(context),
+      );
+      await setCachedReco(stream, recos);
+      app.log.info(`Recos ${stream} préchargées : ${recos.length}`);
+    } catch (error) {
+      app.log.warn(`Préchargement ${stream} échoué : ${error instanceof Error ? error.message : error}`);
+    }
+  }
+}
+
 try {
   await app.listen({ host: HOST, port: PORT });
   startScheduler((msg) => app.log.info(msg));
-  // Connexion proactive du compte par défaut, en arrière-plan.
-  refreshLogin(defaultAccountId());
+  void warmRecommendations(); // cache chaud dès le démarrage
   app.log.info(`Outil de réponse Reddit : http://${HOST}:${PORT} (headless=${HEADLESS})`);
 } catch (error) {
   app.log.error(error);
