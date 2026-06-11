@@ -79,6 +79,9 @@ export const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 /** Fichier JSON de la file de brouillons (réponses préparées, publiées par un humain). */
 export const DRAFTS_FILE = path.join(DATA_DIR, "drafts.json");
 
+/** Comptes ajoutés depuis l'interface (en plus de ACCOUNTS_B64). Modifiable à chaud. */
+export const RUNTIME_ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.json");
+
 /**
  * Protection optionnelle par Basic Auth. Si APP_PASSWORD est défini, toutes les
  * routes l'exigent (indispensable dès que l'outil est exposé sur Internet).

@@ -34,24 +34,20 @@ export const credentialsSchema = z.object({
   totpSecret: z.string().trim().optional(),
 });
 
-export const accountSchema = z
-  .object({
-    id: z.string().trim().min(1),
-    label: z.string().trim().min(1),
-    /** Session exportée (legacy). Optionnelle si des identifiants sont fournis. */
-    sessionB64: z.string().min(1).optional(),
-    /** Identifiants pour la reconnexion automatique. */
-    credentials: credentialsSchema.optional(),
-    /** Pseudo Reddit affiché (u/…), pour l'onglet « Publié ». */
-    redditUsername: z.string().trim().optional(),
-    proxy: proxyConfigSchema.optional(),
-    /** true uniquement pour le compte local (profil persistant + login manuel). */
-    local: z.boolean().optional(),
-  })
-  .refine(
-    (a) => Boolean(a.sessionB64 || a.credentials || a.local),
-    "Chaque compte doit avoir des identifiants (credentials) ou une session.",
-  );
+export const accountSchema = z.object({
+  id: z.string().trim().min(1),
+  label: z.string().trim().min(1),
+  /** Session exportée (legacy). Optionnelle. */
+  sessionB64: z.string().min(1).optional(),
+  /** Identifiants pour la reconnexion automatique (publication). Optionnels. */
+  credentials: credentialsSchema.optional(),
+  /** Pseudo Reddit affiché (u/…), pour l'onglet « Publié ». */
+  redditUsername: z.string().trim().optional(),
+  /** Proxy résidentiel (lecture/publication fiables). */
+  proxy: proxyConfigSchema.optional(),
+  /** true uniquement pour le compte local (profil persistant + login manuel). */
+  local: z.boolean().optional(),
+});
 
 export const accountsSchema = z.array(accountSchema);
 
@@ -79,6 +75,17 @@ export const scheduleInput = replyInput.extend({
       (value) => new Date(value).getTime() > Date.now() - 60_000,
       "La date d'envoi doit être dans le futur",
     ),
+});
+
+export const accountCreateInput = z.object({
+  label: z.string().trim().min(1, "Nom du compte requis"),
+  redditUsername: z.string().trim().optional(),
+  proxyServer: z.string().trim().optional(),
+  proxyUsername: z.string().trim().optional(),
+  proxyPassword: z.string().optional(),
+  username: z.string().trim().optional(),
+  password: z.string().optional(),
+  totpSecret: z.string().trim().optional(),
 });
 
 export const draftReplyInput = z.object({

@@ -676,6 +676,60 @@ td button.link-danger:hover {
   text-decoration: underline;
 }
 
+/* ---------- Comptes (home) ---------- */
+.accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.account-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fafbfc;
+}
+
+.account-card.is-current {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(255, 175, 54, 0.25);
+}
+
+.account-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.account-card-foot {
+  margin-top: 10px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.form-grid input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+}
+
+.form-grid input:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+
 /* ---------- Modal composeur ---------- */
 .modal {
   position: fixed;

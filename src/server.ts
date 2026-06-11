@@ -28,10 +28,15 @@ import { addDraft, readDrafts, removeDraft, updateDraft } from "./drafts/store.j
 import { postReply } from "./reddit/poster.js";
 import { parseRedditUrl } from "./reddit/url.js";
 import {
+  addAccount,
   defaultAccountId,
   getAccount,
   publicAccounts,
+  removeAccount,
+  slugifyId,
 } from "./reddit/accounts.js";
+import { accountCreateInput } from "./schemas.js";
+import type { Account } from "./schemas.js";
 import {
   disposeSession,
   getCachedState,
@@ -81,6 +86,49 @@ function accountLabel(id: string | undefined): string {
 /** Liste des comptes configurés (sans secrets) + compte par défaut. */
 app.get("/api/accounts", async () => {
   return { accounts: publicAccounts(), defaultId: defaultAccountId(), managed: !LOCAL_MODE };
+});
+
+/** Ajoute un compte (marché) depuis l'interface. */
+app.post("/api/accounts", async (request, reply) => {
+  const parsed = accountCreateInput.safeParse(request.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Entrée invalide" });
+  }
+  const d = parsed.data;
+  const account: Account = {
+    id: slugifyId(d.label),
+    label: d.label,
+    ...(d.redditUsername ? { redditUsername: d.redditUsername } : {}),
+    ...(d.proxyServer
+      ? {
+          proxy: {
+            server: d.proxyServer,
+            ...(d.proxyUsername ? { username: d.proxyUsername } : {}),
+            ...(d.proxyPassword ? { password: d.proxyPassword } : {}),
+          },
+        }
+      : {}),
+    ...(d.username && d.password
+      ? {
+          credentials: {
+            username: d.username,
+            password: d.password,
+            ...(d.totpSecret ? { totpSecret: d.totpSecret } : {}),
+          },
+        }
+      : {}),
+  };
+  addAccount(account);
+  return { ok: true, id: account.id };
+});
+
+/** Supprime un compte ajouté via l'interface. */
+app.delete<{ Params: { id: string } }>("/api/accounts/:id", async (request, reply) => {
+  const removed = removeAccount(request.params.id);
+  if (!removed) {
+    return reply.code(404).send({ error: "Compte introuvable ou non supprimable (compte d'environnement)." });
+  }
+  return { ok: true };
 });
 
 /** État de la connexion Reddit pour un compte. */

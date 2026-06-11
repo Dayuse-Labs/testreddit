@@ -26,15 +26,41 @@
     </header>
 
     <nav class="tabs">
-      <button class="tab is-active" data-tab="reco" type="button">Recommandations</button>
+      <button class="tab is-active" data-tab="accounts" type="button">Comptes</button>
+      <button class="tab" data-tab="reco" type="button">Recommandations</button>
       <button class="tab" data-tab="drafts" type="button">Brouillons</button>
       <button class="tab" data-tab="published" type="button">Publié</button>
       <button class="tab" data-tab="doc" type="button">Documentation</button>
     </nav>
 
     <main>
+      <!-- ===== COMPTES (home) ===== -->
+      <section id="tab-accounts" class="tab-panel">
+        <div class="card">
+          <h2>Comptes par marché</h2>
+          <p class="muted-p">Vue d'ensemble des comptes. Choisis le compte actif en haut à droite ; ajoute-en de nouveaux ci-dessous.</p>
+          <div id="accountsList" class="accounts-grid"></div>
+        </div>
+        <div class="card">
+          <h2>Ajouter un compte</h2>
+          <p class="muted-p">Le proxy résidentiel et les identifiants sont optionnels mais recommandés (lecture/publication fiables).</p>
+          <div class="form-grid">
+            <div><label for="acLabel">Nom du marché *</label><input id="acLabel" type="text" placeholder="ex. France" /></div>
+            <div><label for="acReddit">Pseudo Reddit (u/…)</label><input id="acReddit" type="text" placeholder="ex. DayuseFR" /></div>
+            <div><label for="acProxyServer">Proxy — serveur</label><input id="acProxyServer" type="text" placeholder="http://gate.decodo.com:10003" /></div>
+            <div><label for="acProxyUser">Proxy — utilisateur</label><input id="acProxyUser" type="text" placeholder="user-...-country-fr-..." /></div>
+            <div><label for="acProxyPass">Proxy — mot de passe</label><input id="acProxyPass" type="password" /></div>
+            <div><label for="acUser">Reddit — email/pseudo</label><input id="acUser" type="text" /></div>
+            <div><label for="acPass">Reddit — mot de passe</label><input id="acPass" type="password" /></div>
+            <div><label for="acTotp">2FA TOTP (optionnel)</label><input id="acTotp" type="text" /></div>
+          </div>
+          <div id="acError" class="error" hidden></div>
+          <button id="acSave" type="button" class="btn btn-primary">Ajouter le compte</button>
+        </div>
+      </section>
+
       <!-- ===== RECOMMANDATIONS ===== -->
-      <section id="tab-reco" class="tab-panel">
+      <section id="tab-reco" class="tab-panel" hidden>
         <div class="card">
           <div class="card-head">
             <h2>Recommandations (US)</h2>

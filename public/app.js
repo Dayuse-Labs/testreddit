@@ -27,13 +27,91 @@ async function loadAccounts() {
   try {
     const data = await api("/api/accounts");
     const accounts = data.accounts || [];
-    currentAccountId = data.defaultId || (accounts[0] && accounts[0].id) || null;
+    if (!currentAccountId) currentAccountId = data.defaultId || (accounts[0] && accounts[0].id) || null;
     $("accountSelect").innerHTML = accounts
       .map((a) => `<option value="${esc(a.id)}">${esc(a.label)}</option>`)
       .join("");
     if (currentAccountId) $("accountSelect").value = currentAccountId;
+    renderAccountsView(accounts);
   } catch {
     /* ignore */
+  }
+}
+
+function renderAccountsView(accounts) {
+  const list = $("accountsList");
+  if (!list) return;
+  list.innerHTML = accounts
+    .map((a) => {
+      const tags = [
+        a.redditUsername ? `u/${esc(a.redditUsername)}` : "pseudo non défini",
+        a.hasProxy ? "proxy ✓" : "sans proxy",
+        a.hasCredentials ? "identifiants ✓" : "sans identifiants",
+      ]
+        .map((t) => `<span class="chip">${t}</span>`)
+        .join("");
+      const del = a.removable
+        ? `<button class="btn-link-danger" data-del="${esc(a.id)}">Supprimer</button>`
+        : '<span class="muted-p" style="margin:0">env</span>';
+      return `<div class="account-card${a.id === currentAccountId ? " is-current" : ""}">
+        <div class="account-card-top">
+          <strong>${esc(a.label)}</strong>
+          <button class="btn btn-ghost btn-sm" data-use="${esc(a.id)}">Utiliser</button>
+        </div>
+        <div class="reco-meta">${tags}</div>
+        <div class="account-card-foot">${del}</div>
+      </div>`;
+    })
+    .join("");
+}
+
+$("accountsList").addEventListener("click", async (e) => {
+  const use = e.target.closest("[data-use]");
+  const del = e.target.closest("[data-del]");
+  if (use) {
+    currentAccountId = use.getAttribute("data-use");
+    $("accountSelect").value = currentAccountId;
+    renderAccountsView((await api("/api/accounts")).accounts || []);
+  } else if (del) {
+    if (confirm("Supprimer ce compte ?")) {
+      await api(`/api/accounts/${encodeURIComponent(del.getAttribute("data-del"))}`, { method: "DELETE" }).catch((err) => alert(err.message));
+      currentAccountId = null;
+      loadAccounts();
+    }
+  }
+});
+
+async function addAccount() {
+  const label = $("acLabel").value.trim();
+  if (!label) {
+    $("acError").textContent = "Nom du marché requis.";
+    $("acError").hidden = false;
+    return;
+  }
+  $("acSave").disabled = true;
+  try {
+    await api("/api/accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        label,
+        redditUsername: $("acReddit").value.trim(),
+        proxyServer: $("acProxyServer").value.trim(),
+        proxyUsername: $("acProxyUser").value.trim(),
+        proxyPassword: $("acProxyPass").value,
+        username: $("acUser").value.trim(),
+        password: $("acPass").value,
+        totpSecret: $("acTotp").value.trim(),
+      }),
+    });
+    ["acLabel", "acReddit", "acProxyServer", "acProxyUser", "acProxyPass", "acUser", "acPass", "acTotp"].forEach((id) => ($(id).value = ""));
+    $("acError").hidden = true;
+    loadAccounts();
+  } catch (e) {
+    $("acError").textContent = e.message;
+    $("acError").hidden = false;
+  } finally {
+    $("acSave").disabled = false;
   }
 }
 
@@ -46,6 +124,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
       p.hidden = p.id !== `tab-${target}`;
     });
     if (target === "drafts") loadDrafts();
+    if (target === "accounts") loadAccounts();
   });
 });
 
@@ -201,16 +280,17 @@ function draftRow(d) {
   const badge = d.status === "posted"
     ? '<span class="badge badge--ok">publié</span>'
     : '<span class="badge badge--pending">à publier</span>';
-  return `<div class="draft" data-id="${esc(d.id)}">
+  return `<div class="draft" data-id="${esc(d.id)}" data-url="${esc(d.targetUrl)}">
     <div class="draft-head">
       <a class="reco-title" href="${esc(d.targetUrl)}" target="_blank">${esc(d.title)}</a>
       <div class="reco-meta">r/${esc(d.subreddit)} · ${esc(d.accountLabel)} ${badge}</div>
     </div>
     <div class="draft-text">${esc(d.text)}</div>
     <div class="draft-actions">
-      <button class="btn btn-ghost btn-sm" data-act="copy">Copier la réponse</button>
+      ${d.status === "posted" ? "" : '<button class="btn btn-primary btn-sm" data-act="publish">Publier sur Reddit</button>'}
+      <button class="btn btn-ghost btn-sm" data-act="copy">Copier</button>
       <a class="btn btn-ghost btn-sm" href="${esc(d.targetUrl)}" target="_blank">Ouvrir le post</a>
-      ${d.status === "posted" ? "" : '<button class="btn btn-primary btn-sm" data-act="posted">Marquer publié</button>'}
+      ${d.status === "posted" ? "" : '<button class="btn btn-ghost btn-sm" data-act="posted">Marquer publié (manuel)</button>'}
       <button class="btn-link-danger" data-act="delete">Supprimer</button>
     </div>
   </div>`;
@@ -222,11 +302,33 @@ $("draftsList").addEventListener("click", async (e) => {
   const row = e.target.closest(".draft");
   const id = row.getAttribute("data-id");
   const act = actEl.getAttribute("data-act");
-  if (act === "copy") {
+  if (act === "publish") {
+    const url = row.getAttribute("data-url");
+    const text = row.querySelector(".draft-text").textContent;
+    actEl.disabled = true;
+    actEl.textContent = "Publication…";
+    try {
+      await api("/api/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, text, accountId: currentAccountId }),
+      });
+      await api(`/api/drafts/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "posted" }),
+      }).catch(() => {});
+      loadDrafts();
+    } catch (err) {
+      alert(`Échec de publication : ${err.message}\n\nSi c'est un souci de connexion, reconnecte le compte puis réessaie — ou utilise « Copier » + « Ouvrir le post » pour publier à la main.`);
+      actEl.disabled = false;
+      actEl.textContent = "Publier sur Reddit";
+    }
+  } else if (act === "copy") {
     const text = row.querySelector(".draft-text").textContent;
     navigator.clipboard.writeText(text).then(() => {
       actEl.textContent = "Copié ✓";
-      setTimeout(() => (actEl.textContent = "Copier la réponse"), 1500);
+      setTimeout(() => (actEl.textContent = "Copier"), 1500);
     });
   } else if (act === "posted") {
     await api(`/api/drafts/${encodeURIComponent(id)}`, {
@@ -287,6 +389,7 @@ $("composerSave").addEventListener("click", saveDraft);
 $("composerText").addEventListener("input", updateComposerCount);
 $("refreshDrafts").addEventListener("click", loadDrafts);
 $("loadPublished").addEventListener("click", loadPublished);
+$("acSave").addEventListener("click", addAccount);
 
 // --- Init --------------------------------------------------------------------
 loadAccounts();
