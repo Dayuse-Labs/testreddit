@@ -22,6 +22,7 @@
       <div class="topbar-right">
         <div id="status" class="status status--unknown">…</div>
         <button id="reconnect" class="btn btn-ghost btn-sm" hidden>Se reconnecter</button>
+        <button id="manualLogin" class="btn btn-ghost btn-sm" hidden title="Ouvre une fenêtre de login (outil en local)">Connexion manuelle</button>
         <button id="logsToggle" type="button" class="btn btn-ghost btn-sm">Logs</button>
         <label class="account-label" for="accountSelect">Compte</label>
         <select id="accountSelect" class="account-select"></select>
@@ -148,6 +149,18 @@
           <button id="composerCancel" type="button" class="btn btn-ghost">Annuler</button>
           <button id="composerSave" type="button" class="btn btn-primary">Enregistrer le brouillon</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ===== NAVIGATEUR DISTANT (noVNC) ===== -->
+    <div id="vncModal" class="modal" hidden>
+      <div class="modal-box vnc-box">
+        <div class="modal-head">
+          <h3>Connexion Reddit (navigateur distant)</h3>
+          <button id="vncClose" type="button" class="modal-close">×</button>
+        </div>
+        <p class="muted-p">Connecte-toi à Reddit ci-dessous (identifiants + CAPTCHA). Quand le statut passe au vert, ferme cette fenêtre — la session est gardée pour publier.</p>
+        <div id="vncFrameWrap" class="vnc-frame-wrap"></div>
       </div>
     </div>
 

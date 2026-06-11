@@ -237,6 +237,58 @@ export async function startAccountSwitch(): Promise<void> {
   void waitForLoginThenRevert();
 }
 
+/**
+ * Connexion MANUELLE : ouvre une fenêtre (headed) sur la page de login Reddit,
+ * pour que l'humain saisisse les identifiants et résolve un éventuel CAPTCHA.
+ * Ne fonctionne que si l'outil tourne avec un écran (local) — pas en mode
+ * serveur headless. La session obtenue devient le contexte actif du compte.
+ */
+export async function startManualLogin(accountId: string): Promise<void> {
+  const id = accountId || defaultAccountId();
+  const account = getAccount(id);
+  if (!account) throw new Error(`Compte inconnu : ${id}`);
+
+  await runExclusive(async () => {
+    switching = true;
+    await closeContext();
+    try {
+      context = await launchContextForAccount(account, false); // fenêtre visible
+      currentAccountId = id;
+      const page = await getPage(context);
+      await page
+        .goto("https://www.reddit.com/login/", { waitUntil: "domcontentloaded" })
+        .catch(() => undefined);
+      logLine(`Connexion manuelle « ${account.label} » : fenêtre ouverte, connecte-toi.`);
+    } catch (error) {
+      switching = false;
+      throw new Error(
+        "Impossible d'ouvrir une fenêtre — l'outil tourne en mode serveur (headless). " +
+          "La connexion manuelle nécessite de lancer l'outil en local (npm run dev sur ta machine).",
+      );
+    }
+  });
+
+  void waitForManualLogin(id);
+}
+
+async function waitForManualLogin(accountId: string): Promise<void> {
+  const deadline = Date.now() + 5 * 60 * 1000;
+  try {
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const current = context;
+      if (!current) break;
+      const user = await getLoggedInUser(current).catch(() => null);
+      if (user) {
+        logLine(`Connexion manuelle réussie : u/${user} (compte ${accountId}).`);
+        break;
+      }
+    }
+  } finally {
+    switching = false;
+  }
+}
+
 async function waitForLoginThenRevert(): Promise<void> {
   const deadline = Date.now() + 5 * 60 * 1000;
   try {

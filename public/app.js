@@ -147,7 +147,9 @@ async function loadStatus() {
       el.className = "status status--err";
       el.title = d.error || "";
       $("reconnect").hidden = false;
+      $("manualLogin").hidden = false;
     }
+    if (d.loggedIn) $("manualLogin").hidden = true;
   } catch {
     el.textContent = "statut indisponible";
     el.className = "status status--err";
@@ -587,6 +589,35 @@ $("accountSelect").addEventListener("change", () => {
   loadDrafts();
 });
 $("reconnect").addEventListener("click", reconnect);
+let vncStatusPoll = null;
+$("manualLogin").addEventListener("click", async () => {
+  openLogs();
+  $("manualLogin").disabled = true;
+  try {
+    // Ouvre le navigateur (headed) côté serveur, sur l'écran virtuel VNC.
+    await api(`/api/manual-login${accountQuery()}`, { method: "POST" });
+    // Affiche ce navigateur distant dans l'UI via noVNC.
+    $("vncFrameWrap").innerHTML =
+      '<iframe class="vnc-frame" src="/novnc/vnc.html?autoconnect=true&reconnect=true&resize=scale&path=novnc/websockify"></iframe>';
+    $("vncModal").hidden = false;
+    if (vncStatusPoll) clearInterval(vncStatusPoll);
+    vncStatusPoll = setInterval(loadStatus, 4000);
+  } catch (e) {
+    alert(`${e.message}`);
+  } finally {
+    $("manualLogin").disabled = false;
+  }
+});
+function closeVnc() {
+  $("vncModal").hidden = true;
+  $("vncFrameWrap").innerHTML = ""; // coupe le flux
+  if (vncStatusPoll) {
+    clearInterval(vncStatusPoll);
+    vncStatusPoll = null;
+  }
+  loadStatus();
+}
+$("vncClose").addEventListener("click", closeVnc);
 $("logsToggle").addEventListener("click", toggleLogs);
 $("logClose").addEventListener("click", closeLogs);
 $("logClear").addEventListener("click", () => {

@@ -89,6 +89,10 @@ export const RUNTIME_ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.json");
 export const APP_USER = process.env.APP_USER ?? "admin";
 export const APP_PASSWORD = process.env.APP_PASSWORD ?? "";
 
+/** Pile noVNC (navigateur distant interactif) : login depuis l'UI web. */
+export const ENABLE_VNC = process.env.ENABLE_VNC === "1";
+export const NOVNC_PORT = Number.parseInt(process.env.NOVNC_PORT ?? "6080", 10);
+
 /**
  * Publication en headless par défaut (cf. plan). Mettre HEADLESS=false pour
  * repasser en fenêtre visible si Reddit bloque l'automatisation headless.

@@ -1,12 +1,15 @@
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
+import fastifyHttpProxy from "@fastify/http-proxy";
 import { mkdir } from "node:fs/promises";
 import {
   APP_PASSWORD,
   APP_USER,
+  ENABLE_VNC,
   HEADLESS,
   HOST,
   LOCAL_MODE,
+  NOVNC_PORT,
   PORT,
   PUBLIC_DIR,
   SCREENSHOTS_DIR,
@@ -43,6 +46,7 @@ import {
   isSwitching,
   resetLoginCooldown,
   startAccountSwitch,
+  startManualLogin,
   withAccount,
   withLoggedInAccount,
 } from "./reddit/session.js";
@@ -58,12 +62,24 @@ const app = Fastify({ logger: { transport: undefined } });
 if (APP_PASSWORD) {
   const expected = "Basic " + Buffer.from(`${APP_USER}:${APP_PASSWORD}`).toString("base64");
   app.addHook("onRequest", async (request, reply) => {
+    // /novnc exempté : le flux VNC (iframe + websocket) ne porte pas le Basic Auth.
+    if (request.url.startsWith("/novnc")) return;
     if (request.headers.authorization !== expected) {
       return reply
         .code(401)
         .header("WWW-Authenticate", 'Basic realm="Réponses Reddit"')
         .send({ error: "Authentification requise" });
     }
+  });
+}
+
+// --- Navigateur distant (noVNC) : proxy du client + websocket vers websockify ---
+if (ENABLE_VNC) {
+  await app.register(fastifyHttpProxy, {
+    upstream: `http://127.0.0.1:${NOVNC_PORT}`,
+    prefix: "/novnc",
+    rewritePrefix: "",
+    websocket: true,
   });
 }
 
@@ -165,6 +181,17 @@ app.post<{ Querystring: { account?: string } }>("/api/reconnect", async (request
     ...(login.ok ? {} : { error: login.error }),
     ...(login.screenshotFile ? { screenshotFile: login.screenshotFile } : {}),
   };
+});
+
+/** Connexion manuelle : ouvre une fenêtre (local uniquement) pour login humain. */
+app.post<{ Querystring: { account?: string } }>("/api/manual-login", async (request, reply) => {
+  const accountId = request.query.account ?? defaultAccountId();
+  try {
+    await startManualLogin(accountId);
+    return { ok: true, message: "Fenêtre ouverte — connecte-toi (CAPTCHA inclus). Le statut passera au vert." };
+  } catch (error) {
+    return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+  }
 });
 
 /** Journal en direct (polling incrémental : ?since=<index>). */

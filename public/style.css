@@ -774,6 +774,25 @@ td button.link-danger:hover {
   display: none;
 }
 
+.vnc-box {
+  max-width: 1200px;
+  width: 96vw;
+}
+
+.vnc-frame-wrap {
+  width: 100%;
+  height: 70vh;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.vnc-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
 .modal-box {
   background: var(--surface);
   border-radius: 14px;

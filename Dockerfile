@@ -1,5 +1,4 @@
-# Base Node ; on installe Chromium + ses dépendances système alignés sur la
-# version de playwright résolue (évite les décalages de version d'image).
+# Base Node ; Chromium + dépendances + pile VNC (navigateur distant interactif).
 FROM node:20-bookworm
 
 WORKDIR /app
@@ -7,17 +6,21 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --include=dev
 
-# Chromium + libs système pour la version de playwright installée, et xvfb pour
-# le mode "headed" virtuel (HEADLESS=false), moins détectable par l'anti-bot.
+# Chromium + libs système, et la pile écran virtuel / VNC / noVNC :
+# - xvfb : écran virtuel ; fluxbox : gestionnaire de fenêtres léger
+# - x11vnc : serveur VNC sur le display ; websockify + novnc : pont + client web
 RUN npx playwright install --with-deps chromium \
-  && apt-get update && apt-get install -y --no-install-recommends xvfb xauth \
+  && apt-get update && apt-get install -y --no-install-recommends \
+    xvfb x11vnc fluxbox novnc websockify \
   && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
 ENV HOST=0.0.0.0
 ENV NODE_ENV=production
+# Mode headed sur l'écran virtuel + pile VNC active (login interactif depuis l'UI).
+ENV HEADLESS=false
+ENV ENABLE_VNC=1
+ENV DISPLAY=:99
 
-# Headless par défaut (fiable) ; xvfb seulement si HEADLESS=false (voir entrypoint).
-# Invoqué via sh : pas de dépendance au bit exécutable.
 CMD ["sh", "scripts/docker-entrypoint.sh"]
