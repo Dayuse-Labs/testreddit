@@ -239,6 +239,11 @@ export async function startManualLogin(accountId: string): Promise<void> {
     try {
       context = await launchContextForAccount(account, false); // fenêtre visible
       currentAccountId = id;
+      // Si le navigateur se ferme tout seul (crash/OOM), on le signale dans les
+      // logs en direct — sinon l'utilisateur ne voit qu'un bureau VNC vide.
+      context.browser()?.on("disconnected", () => {
+        logLine(`⚠️ Navigateur « ${account.label} » fermé de façon inattendue (crash probable). Réessaie « Se connecter (manuel) ».`);
+      });
       const page = await getPage(context);
       await page.bringToFront().catch(() => undefined);
       // URL de login « propre » (sans paramètres, qui peuvent déclencher un blocage).

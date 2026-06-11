@@ -29,6 +29,21 @@ const COMMON_OPTIONS = {
 } as const;
 
 /**
+ * Flags de stabilité indispensables en conteneur (Docker/Railway) :
+ * - `--disable-dev-shm-usage` : sans lui, Chromium utilise /dev/shm (≈64 Mo en
+ *   conteneur) pour le rendu → une page lourde (login Reddit) l'épuise et le
+ *   navigateur CRASHE (bureau VNC vide). On le redirige vers /tmp.
+ * - `--disable-gpu` : pas de GPU derrière Xvfb, évite des crashes du renderer.
+ * - `--no-sandbox` : requis en conteneur (pas de namespaces utilisateur).
+ */
+const CONTAINER_STABILITY_ARGS = [
+  "--disable-blink-features=AutomationControlled",
+  "--no-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+] as const;
+
+/**
  * Construit l'option proxy Playwright pour un compte. L'IP résidentielle est
  * dédiée et STABLE par compte (jeton de session sticky dérivé de l'id) — voir
  * resolveAccountProxy : chaque compte sort par une IP distincte, ce qui évite
@@ -67,7 +82,7 @@ export async function launchContextForAccount(
       executablePath: chromiumPath(),
       ...COMMON_OPTIONS,
       ...proxy,
-      args: ["--disable-blink-features=AutomationControlled"],
+      args: [...CONTAINER_STABILITY_ARGS],
     });
     return ctx;
   }
@@ -80,8 +95,7 @@ export async function launchContextForAccount(
     executablePath: chromiumPath(),
     ...proxy,
     args: [
-      "--disable-blink-features=AutomationControlled",
-      "--no-sandbox",
+      ...CONTAINER_STABILITY_ARGS,
       // En headed (écran virtuel/VNC) : fenêtre plein écran, visible et au 1er plan.
       "--window-position=0,0",
       "--window-size=1360,900",
