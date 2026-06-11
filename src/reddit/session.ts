@@ -4,6 +4,7 @@ import { HEADLESS, LOCAL_MODE, PROFILE_DIR } from "../config.js";
 import { getLoggedInUser, getPage, launchContext, launchContextForAccount } from "./browser.js";
 import { defaultAccountId, getAccount } from "./accounts.js";
 import { performLogin, type LoginResult } from "./login-flow.js";
+import { logLine } from "../log.js";
 
 /**
  * Gère un unique contexte Chromium actif, identifié par compte. Les opérations
@@ -116,9 +117,13 @@ async function loginIfNeeded(accountId: string): Promise<LoginResult> {
 
   let result: LoginResult = { ok: false, error: "Échec de connexion." };
   for (let attempt = 1; attempt <= MAX_LOGIN_ATTEMPTS; attempt++) {
+    logLine(`Reconnexion « ${account.label} » — tentative ${attempt}/${MAX_LOGIN_ATTEMPTS}`);
     result = await performLogin(context, account.credentials, Date.now() / 1000);
     if (result.ok || !result.retryable) return result; // succès, ou échec dur (CAPTCHA/identifiants)
-    if (attempt < MAX_LOGIN_ATTEMPTS) await relaunchContext(accountId); // IP bloquée → autre IP
+    if (attempt < MAX_LOGIN_ATTEMPTS) {
+      logLine("Rotation : nouvelle IP résidentielle…");
+      await relaunchContext(accountId); // IP bloquée → autre IP
+    }
   }
   return result;
 }

@@ -22,6 +22,7 @@
       <div class="topbar-right">
         <div id="status" class="status status--unknown">…</div>
         <button id="reconnect" class="btn btn-ghost btn-sm" hidden>Se reconnecter</button>
+        <button id="logsToggle" type="button" class="btn btn-ghost btn-sm">Logs</button>
         <label class="account-label" for="accountSelect">Compte</label>
         <select id="accountSelect" class="account-select"></select>
       </div>
@@ -148,6 +149,18 @@
           <button id="composerSave" type="button" class="btn btn-primary">Enregistrer le brouillon</button>
         </div>
       </div>
+    </div>
+
+    <!-- ===== LOGS EN DIRECT (drawer) ===== -->
+    <div id="logDrawer" class="log-drawer" hidden>
+      <div class="log-head">
+        <strong>Logs en direct</strong>
+        <div class="row-actions">
+          <button id="logClear" type="button" class="btn-link-danger">Vider</button>
+          <button id="logClose" type="button" class="modal-close">×</button>
+        </div>
+      </div>
+      <pre id="logContent" class="log-content"></pre>
     </div>
 
     <script src="/app.js"></script>

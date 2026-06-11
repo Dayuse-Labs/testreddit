@@ -154,15 +154,57 @@ async function loadStatus() {
   }
 }
 
+// --- Logs en direct ----------------------------------------------------------
+let logSince = 0;
+let logTimer = null;
+
+async function pollLogs() {
+  try {
+    const d = await api(`/api/logs?since=${logSince}`);
+    if (d.lines && d.lines.length) {
+      const pre = $("logContent");
+      for (const l of d.lines) {
+        const time = new Date(l.t).toLocaleTimeString("fr-FR");
+        pre.textContent += `${time}  ${l.msg}\n`;
+      }
+      logSince = d.last;
+      pre.scrollTop = pre.scrollHeight;
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function openLogs() {
+  $("logDrawer").hidden = false;
+  if (!logTimer) {
+    pollLogs();
+    logTimer = setInterval(pollLogs, 1200);
+  }
+}
+function closeLogs() {
+  $("logDrawer").hidden = true;
+  if (logTimer) {
+    clearInterval(logTimer);
+    logTimer = null;
+  }
+}
+function toggleLogs() {
+  if ($("logDrawer").hidden) openLogs();
+  else closeLogs();
+}
+
 async function reconnect() {
+  openLogs(); // affiche les logs en direct pendant la reconnexion
   $("reconnect").disabled = true;
   $("reconnect").textContent = "Reconnexion…";
   try {
     const d = await api(`/api/reconnect${accountQuery()}`, { method: "POST" });
     if (!d.ok) {
+      const shot = d.screenshotFile ? `\n\nCapture de diagnostic : /screenshots/${d.screenshotFile}` : "";
       alert(
-        `Reconnexion échouée : ${d.error || "inconnue"}\n\n` +
-          "Si ça persiste, recapture une session en local : npm run login (puis export-session / variable).",
+        `Reconnexion échouée : ${d.error || "inconnue"}${shot}\n\n` +
+          "Regarde les logs en direct ci-dessous. Si ça persiste (CAPTCHA/anti-bot), recapture une session en local : npm run login.",
       );
     }
   } catch (e) {
@@ -545,6 +587,11 @@ $("accountSelect").addEventListener("change", () => {
   loadDrafts();
 });
 $("reconnect").addEventListener("click", reconnect);
+$("logsToggle").addEventListener("click", toggleLogs);
+$("logClose").addEventListener("click", closeLogs);
+$("logClear").addEventListener("click", () => {
+  $("logContent").textContent = "";
+});
 $("loadReco").addEventListener("click", () => loadReco(false));
 $("refreshReco").addEventListener("click", () => loadReco(true));
 $("newManual").addEventListener("click", () => openComposer(null));

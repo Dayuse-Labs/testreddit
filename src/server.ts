@@ -49,6 +49,7 @@ import {
 import { appendHistory, readHistory, type HistoryEntry } from "./history/store.js";
 import { addSchedule, readSchedule, removeSchedule } from "./schedule/store.js";
 import { startScheduler } from "./schedule/scheduler.js";
+import { getLogsSince, logLine } from "./log.js";
 
 const app = Fastify({ logger: { transport: undefined } });
 
@@ -155,8 +156,21 @@ app.get<{ Querystring: { account?: string } }>("/api/status", async (request) =>
 app.post<{ Querystring: { account?: string } }>("/api/reconnect", async (request) => {
   const accountId = request.query.account ?? defaultAccountId();
   resetLoginCooldown(accountId);
+  logLine(`Reconnexion demandée pour « ${accountLabel(accountId)} »…`);
   const login = await withLoggedInAccount(accountId, async (_context, result) => result);
-  return { ok: login.ok, user: login.user ?? null, accountId, ...(login.ok ? {} : { error: login.error }) };
+  return {
+    ok: login.ok,
+    user: login.user ?? null,
+    accountId,
+    ...(login.ok ? {} : { error: login.error }),
+    ...(login.screenshotFile ? { screenshotFile: login.screenshotFile } : {}),
+  };
+});
+
+/** Journal en direct (polling incrémental : ?since=<index>). */
+app.get<{ Querystring: { since?: string } }>("/api/logs", async (request) => {
+  const since = Number.parseInt(request.query.since ?? "0", 10) || 0;
+  return getLogsSince(since);
 });
 
 /** IP de sortie réellement vue par les sites (diagnostic proxy) pour un compte. */

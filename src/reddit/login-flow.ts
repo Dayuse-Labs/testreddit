@@ -4,6 +4,7 @@ import path from "node:path";
 import type { BrowserContext } from "playwright";
 import { SCREENSHOTS_DIR } from "../config.js";
 import { getLoggedInUser, getPage } from "./browser.js";
+import { logLine } from "../log.js";
 import type { Credentials } from "../schemas.js";
 
 export type LoginResult = {
@@ -64,6 +65,7 @@ export async function performLogin(
   const page = await getPage(context);
 
   try {
+    logLine("Login : ouverture de reddit.com/login…");
     await page.goto("https://www.reddit.com/login/", {
       waitUntil: "domcontentloaded",
       timeout: 45000,
@@ -73,6 +75,7 @@ export async function performLogin(
     // Blocage réseau (IP du proxy flaggée) → réessayable avec une autre IP.
     const content = await page.content();
     if (/blocked by network security|bloqué par.*sécurité/i.test(content)) {
+      logLine("Login : ⚠️ IP bloquée (network security) → rotation d'IP");
       return { ok: false, retryable: true, error: "IP bloquée par Reddit (network security)." };
     }
 
@@ -82,8 +85,10 @@ export async function performLogin(
       .then(() => true)
       .catch(() => false);
     if (!formVisible) {
+      logLine("Login : formulaire indisponible → rotation d'IP");
       return { ok: false, retryable: true, error: "Formulaire de login indisponible (IP/charge ?)." };
     }
+    logLine("Login : formulaire trouvé, saisie des identifiants…");
     // Saisie « humaine » caractère par caractère (Reddit détecte le fill instantané).
     await userField.click();
     await userField.pressSequentially(credentials.username, { delay: 80 });
@@ -92,6 +97,7 @@ export async function performLogin(
     await passwordField.click();
     await passwordField.pressSequentially(credentials.password, { delay: 80 });
     await page.waitForTimeout(600);
+    logLine("Login : soumission du formulaire, attente de la connexion…");
     await submitForm(page, passwordField);
 
     // Attend connexion / 2FA / échec.
@@ -101,12 +107,16 @@ export async function performLogin(
       await page.waitForTimeout(2000);
 
       const user = await getLoggedInUser(context).catch(() => null);
-      if (user) return { ok: true, user };
+      if (user) {
+        logLine(`Login : ✅ connecté en tant que u/${user}`);
+        return { ok: true, user };
+      }
 
       // Champ de code 2FA présent ? (saisie unique)
       if (!twoFADone && credentials.totpSecret) {
         const otp = page.locator('input[name="otp"], input[autocomplete="one-time-code"]').first();
         if (await otp.isVisible().catch(() => false)) {
+          logLine("Login : code 2FA demandé, saisie du TOTP…");
           await otp.fill(generateTotp(credentials.totpSecret, nowSeconds));
           await submitForm(page, otp);
           twoFADone = true;
@@ -115,6 +125,7 @@ export async function performLogin(
     }
 
     // Échec : capture pour diagnostic.
+    logLine("Login : ❌ échec (probable CAPTCHA / 2FA SMS / identifiants). Capture enregistrée.");
     const screenshotFile = await captureFailure(page, credentials.username);
     return {
       ok: false,
