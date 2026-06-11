@@ -17,18 +17,6 @@ function chromiumPath(): string {
   return basePlaywright.executablePath();
 }
 
-/** Évasions complémentaires appliquées à chaque contexte (filet de sécurité). */
-async function applyStealth(context: BrowserContext): Promise<void> {
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-    // @ts-expect-error chrome n'existe pas dans les types DOM
-    window.chrome = window.chrome || { runtime: {} };
-    Object.defineProperty(navigator, "languages", {
-      get: () => ["fr-FR", "fr", "en-US", "en"],
-    });
-    Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
-  });
-}
 import { BROWSER_USER_AGENT, PROFILE_DIR } from "../config.js";
 import { localAccount } from "./accounts.js";
 import type { Account } from "../schemas.js";
@@ -99,7 +87,6 @@ export async function launchContextForAccount(
       ...proxy,
       args: ["--disable-blink-features=AutomationControlled"],
     });
-    await applyStealth(ctx);
     return ctx;
   }
 
@@ -123,7 +110,6 @@ export async function launchContextForAccount(
     ...COMMON_OPTIONS,
     ...(storageState ? { storageState } : {}),
   });
-  await applyStealth(ctx);
   return ctx;
 }
 

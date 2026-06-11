@@ -84,9 +84,14 @@ export async function performLogin(
     if (!formVisible) {
       return { ok: false, retryable: true, error: "Formulaire de login indisponible (IP/charge ?)." };
     }
-    await userField.fill(credentials.username);
+    // Saisie « humaine » caractère par caractère (Reddit détecte le fill instantané).
+    await userField.click();
+    await userField.pressSequentially(credentials.username, { delay: 80 });
+    await page.waitForTimeout(400);
     const passwordField = page.locator('input[name="password"]').first();
-    await passwordField.fill(credentials.password);
+    await passwordField.click();
+    await passwordField.pressSequentially(credentials.password, { delay: 80 });
+    await page.waitForTimeout(600);
     await submitForm(page, passwordField);
 
     // Attend connexion / 2FA / échec.
@@ -136,13 +141,15 @@ async function submitForm(
   page: import("playwright").Page,
   field: import("playwright").Locator,
 ): Promise<void> {
-  await field.press("Enter").catch(() => undefined);
   const button = page
-    .getByRole("button", { name: /log ?in|connexion|se connecter|continue|continuer/i })
+    .getByRole("button", { name: /se connecter|log ?in|connexion|continue|continuer/i })
     .first();
   if (await button.isVisible().catch(() => false)) {
     await button.click().catch(() => undefined);
+    return;
   }
+  // Repli : valider au clavier.
+  await field.press("Enter").catch(() => undefined);
 }
 
 async function captureFailure(
