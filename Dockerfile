@@ -18,5 +18,6 @@ COPY . .
 ENV HOST=0.0.0.0
 ENV NODE_ENV=production
 
-# xvfb-run fournit un écran virtuel (sans effet si HEADLESS=true).
-CMD ["xvfb-run", "-a", "npm", "run", "start"]
+# Headless par défaut (fiable) ; xvfb seulement si HEADLESS=false (voir entrypoint).
+# Invoqué via sh : pas de dépendance au bit exécutable.
+CMD ["sh", "scripts/docker-entrypoint.sh"]
