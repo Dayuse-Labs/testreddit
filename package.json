@@ -8,6 +8,7 @@
     "login": "tsx scripts/login.ts",
     "switch": "tsx scripts/login.ts --switch",
     "signup": "tsx scripts/signup.ts",
+    "open": "tsx scripts/open.ts",
     "export-session": "tsx scripts/export-session.ts",
     "add-account": "tsx scripts/add-account.ts",
     "build-accounts": "tsx scripts/build-accounts.ts",
