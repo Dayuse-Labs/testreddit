@@ -2,6 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 let currentAccountId = null;
+let currentStream = "generic";
 let composerState = {};
 
 function esc(v) {
@@ -49,12 +50,27 @@ document.querySelectorAll(".tab").forEach((tab) => {
 });
 
 // --- Recommandations ---------------------------------------------------------
+// Bascule de flux (Générique / Dayuse).
+document.querySelectorAll(".seg").forEach((seg) => {
+  seg.addEventListener("click", () => {
+    currentStream = seg.getAttribute("data-stream");
+    document.querySelectorAll(".seg").forEach((s) => s.classList.toggle("is-active", s === seg));
+    $("streamHint").textContent =
+      currentStream === "dayuse"
+        ? "Dayuse : threads liés au day-use, spa, layover, daycation, télétravail… (plan de recherche Dayuse)."
+        : "Générique : fils actifs, non polémiques, à valeur ajoutée — pour une présence humaine de qualité.";
+    $("recoList").innerHTML = "";
+    $("recoStatus").textContent = "";
+  });
+});
+
 async function loadReco() {
   $("loadReco").disabled = true;
-  $("recoStatus").textContent = "Analyse des subreddits en cours… (~20-40 s)";
+  $("recoStatus").textContent = "Analyse Reddit en cours… (~20-40 s)";
   $("recoList").innerHTML = "";
   try {
-    const data = await api(`/api/recommendations${accountQuery()}`);
+    const sep = accountQuery() ? "&" : "?";
+    const data = await api(`/api/recommendations${accountQuery()}${sep}stream=${currentStream}`);
     const recos = data.recommendations || [];
     $("recoStatus").textContent = recos.length
       ? `${recos.length} threads recommandés.`
@@ -230,22 +246,26 @@ $("draftsList").addEventListener("click", async (e) => {
 // --- Publié ------------------------------------------------------------------
 async function loadPublished() {
   const user = $("pubUser").value.trim();
-  if (!user) return;
   $("publishedList").innerHTML = '<p class="muted-p">Chargement…</p>';
   try {
-    const data = await api(`/api/published${accountQuery()}&user=${encodeURIComponent(user)}`);
-    const items = data.comments || [];
+    const sep = accountQuery() ? "&" : "?";
+    const q = user ? `${sep}user=${encodeURIComponent(user)}` : "";
+    const data = await api(`/api/published${accountQuery()}${q}`);
+    const items = data.activity || [];
     $("publishedList").innerHTML = items.length
       ? items
-          .map(
-            (c) => `<div class="draft">
-              <div class="reco-meta">r/${esc(c.subreddit)}</div>
-              <div class="draft-text">${esc(c.body)}</div>
-              <div class="draft-actions"><a class="btn btn-ghost btn-sm" href="${esc(c.permalink)}" target="_blank">Voir sur Reddit</a></div>
-            </div>`,
-          )
+          .map((a) => {
+            const tag = a.kind === "post" ? "post" : "commentaire";
+            const head = a.title ? `<div class="reco-title">${esc(a.title)}</div>` : "";
+            return `<div class="draft">
+              <div class="reco-meta">${tag} · r/${esc(a.subreddit)} · ${a.score} pts</div>
+              ${head}
+              ${a.body ? `<div class="draft-text">${esc(a.body)}</div>` : ""}
+              <div class="draft-actions"><a class="btn btn-ghost btn-sm" href="${esc(a.permalink)}" target="_blank">Voir sur Reddit</a></div>
+            </div>`;
+          })
           .join("")
-      : '<p class="muted-p">Aucun commentaire public trouvé (compte neuf, contenu filtré, ou pseudo erroné).</p>';
+      : '<p class="muted-p">Aucune activité publique trouvée (compte neuf, contenu filtré, ou pseudo erroné).</p>';
   } catch (e) {
     $("publishedList").innerHTML = `<p class="error">${esc(e.message)}</p>`;
   }

@@ -42,6 +42,8 @@ export const accountSchema = z
     sessionB64: z.string().min(1).optional(),
     /** Identifiants pour la reconnexion automatique. */
     credentials: credentialsSchema.optional(),
+    /** Pseudo Reddit affiché (u/…), pour l'onglet « Publié ». */
+    redditUsername: z.string().trim().optional(),
     proxy: proxyConfigSchema.optional(),
     /** true uniquement pour le compte local (profil persistant + login manuel). */
     local: z.boolean().optional(),

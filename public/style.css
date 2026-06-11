@@ -545,6 +545,31 @@ td button.link-danger:hover {
 .row-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--context-bg);
+  border-radius: 100px;
+  padding: 3px;
+}
+
+.seg {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 6px 16px;
+  border-radius: 100px;
+  cursor: pointer;
+}
+
+.seg.is-active {
+  background: var(--grad-primary);
+  color: var(--text);
 }
 
 .muted-p {

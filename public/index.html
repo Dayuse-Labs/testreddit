@@ -37,13 +37,19 @@
       <section id="tab-reco" class="tab-panel">
         <div class="card">
           <div class="card-head">
-            <h2>Threads à valeur ajoutée (US)</h2>
+            <h2>Recommandations (US)</h2>
             <div class="row-actions">
               <button id="newManual" type="button" class="btn btn-ghost btn-sm">Réponse manuelle</button>
-              <button id="loadReco" type="button" class="btn btn-primary btn-sm">Charger les recommandations</button>
             </div>
           </div>
-          <p class="muted-p">Fils récents, actifs et non polémiques où une réponse utile a sa place. Choisis-en un, prépare la réponse, un humain publiera.</p>
+          <div class="row-actions" style="margin-bottom:10px">
+            <div class="segmented">
+              <button class="seg is-active" data-stream="generic" type="button">Générique</button>
+              <button class="seg" data-stream="dayuse" type="button">Dayuse</button>
+            </div>
+            <button id="loadReco" type="button" class="btn btn-primary btn-sm">Charger</button>
+          </div>
+          <p class="muted-p" id="streamHint">Générique : fils actifs, non polémiques, à valeur ajoutée — pour une présence humaine de qualité.</p>
           <div id="recoStatus" class="muted-p"></div>
           <div id="recoList" class="reco-list"></div>
         </div>
@@ -65,9 +71,9 @@
       <section id="tab-published" class="tab-panel" hidden>
         <div class="card">
           <h2>Activité publiée du compte</h2>
-          <label for="pubUser">Pseudo Reddit du compte</label>
+          <p class="muted-p">Commentaires et posts publiés par le compte sélectionné (lecture connectée — fiable).</p>
           <div class="row">
-            <input id="pubUser" type="text" placeholder="ex. AblePosition9803" autocomplete="off" />
+            <input id="pubUser" type="text" placeholder="pseudo Reddit (laisser vide si configuré sur le compte)" autocomplete="off" />
             <button id="loadPublished" type="button" class="btn btn-primary">Charger</button>
           </div>
           <div id="publishedList" class="drafts-list"></div>

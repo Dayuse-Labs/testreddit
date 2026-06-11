@@ -21,8 +21,8 @@ import {
 } from "./schemas.js";
 import { fetchPreview } from "./reddit/preview.js";
 import { getEgressIp } from "./reddit/browser.js";
-import { fetchUserComments } from "./reddit/read.js";
-import { recommendGeneric } from "./recommend/recommend.js";
+import { fetchUserActivity } from "./reddit/read.js";
+import { recommendDayuse, recommendGeneric } from "./recommend/recommend.js";
 import { draftReply } from "./gemini.js";
 import { addDraft, readDrafts, removeDraft, updateDraft } from "./drafts/store.js";
 import { postReply } from "./reddit/poster.js";
@@ -225,25 +225,34 @@ app.delete<{ Params: { id: string } }>("/api/schedule/:id", async (request, repl
   return { ok: true };
 });
 
-/** Recommandations de threads génériques (lecture via proxy, sans login). */
-app.get<{ Querystring: { account?: string } }>("/api/recommendations", async (request, reply) => {
-  const accountId = request.query.account ?? defaultAccountId();
-  try {
-    const recos = await withAccount(accountId, (context) => recommendGeneric(context));
-    return { recommendations: recos, accountId };
-  } catch (error) {
-    return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
-  }
-});
+/** Recommandations de threads (lecture .json authentifiée via la session). */
+app.get<{ Querystring: { account?: string; stream?: string } }>(
+  "/api/recommendations",
+  async (request, reply) => {
+    const accountId = request.query.account ?? defaultAccountId();
+    const stream = request.query.stream === "dayuse" ? "dayuse" : "generic";
+    try {
+      // Lecture via la session existante (pas d'auto-login fragile).
+      const recos = await withAccount(accountId, (context) =>
+        stream === "dayuse" ? recommendDayuse(context) : recommendGeneric(context),
+      );
+      return { recommendations: recos, accountId, stream };
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  },
+);
 
-/** Activité publiée par un compte (lecture via proxy). ?user=<pseudo Reddit>. */
+/** Activité publiée par un compte (commentaires + posts, .json authentifié). */
 app.get<{ Querystring: { account?: string; user?: string } }>("/api/published", async (request, reply) => {
   const accountId = request.query.account ?? defaultAccountId();
-  const user = request.query.user;
-  if (!user) return reply.code(400).send({ error: "Paramètre ?user=<pseudo Reddit> requis." });
+  const user = request.query.user ?? getAccount(accountId)?.redditUsername;
+  if (!user) {
+    return reply.code(400).send({ error: "Pseudo Reddit requis (?user= ou champ redditUsername du compte)." });
+  }
   try {
-    const comments = await withAccount(accountId, (context) => fetchUserComments(context, user));
-    return { comments, user, accountId };
+    const activity = await withAccount(accountId, (context) => fetchUserActivity(context, user));
+    return { activity, user, accountId };
   } catch (error) {
     return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
   }
