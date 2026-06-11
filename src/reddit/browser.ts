@@ -19,6 +19,7 @@ function chromiumPath(): string {
 
 import { BROWSER_USER_AGENT, PROFILE_DIR } from "../config.js";
 import { localAccount } from "./accounts.js";
+import { getInjectedSession } from "./injected-sessions.js";
 import type { Account } from "../schemas.js";
 
 const COMMON_OPTIONS = {
@@ -107,11 +108,16 @@ export async function launchContextForAccount(
     ],
   });
 
-  const storageState = account.sessionB64
-    ? (JSON.parse(
-        Buffer.from(account.sessionB64, "base64").toString("utf8"),
-      ) as BrowserContextOptions["storageState"])
-    : undefined;
+  // Priorité à la session injectée depuis le navigateur de l'utilisateur (extension),
+  // sinon la session legacy (sessionB64). Sinon, login par identifiants.
+  const injected = getInjectedSession(account.id);
+  const storageState = injected
+    ? injected
+    : account.sessionB64
+      ? (JSON.parse(
+          Buffer.from(account.sessionB64, "base64").toString("utf8"),
+        ) as BrowserContextOptions["storageState"])
+      : undefined;
 
   const ctx = await browser.newContext({
     ...COMMON_OPTIONS,

@@ -207,6 +207,11 @@ export function getActiveAccountId(): string | null {
   return currentAccountId;
 }
 
+/** Ferme le contexte courant (la prochaine opération le relance, ex. après injection de session). */
+export function resetContext(): Promise<void> {
+  return runExclusive(() => closeContext());
+}
+
 export function isSwitching(): boolean {
   return switching;
 }

@@ -44,12 +44,15 @@ import type { Account } from "./schemas.js";
 import {
   disposeSession,
   isSwitching,
+  resetContext,
   resetLoginCooldown,
   startAccountSwitch,
   startManualLogin,
   withAccount,
   withLoggedInAccount,
 } from "./reddit/session.js";
+import { setInjectedSession, type StorageState } from "./reddit/injected-sessions.js";
+import { sessionInput } from "./schemas.js";
 import { appendHistory, readHistory, type HistoryEntry } from "./history/store.js";
 import { addSchedule, readSchedule, removeSchedule } from "./schedule/store.js";
 import { startScheduler } from "./schedule/scheduler.js";
@@ -191,6 +194,52 @@ app.post<{ Querystring: { account?: string } }>("/api/manual-login", async (requ
     return { ok: true, message: "Fenêtre ouverte — connecte-toi (CAPTCHA inclus). Le statut passera au vert." };
   } catch (error) {
     return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+/** Injecte une session capturée depuis le navigateur de l'utilisateur (extension). */
+function mapSameSite(s?: string): "Strict" | "Lax" | "None" {
+  const v = (s ?? "").toLowerCase();
+  if (v === "strict") return "Strict";
+  if (v === "no_restriction" || v === "none") return "None";
+  return "Lax";
+}
+
+app.post("/api/session", async (request, reply) => {
+  const parsed = sessionInput.safeParse(request.body);
+  if (!parsed.success) {
+    return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Entrée invalide" });
+  }
+  const accountId = parsed.data.accountId ?? defaultAccountId();
+  const cookies = parsed.data.cookies
+    .filter((c) => c.domain.includes("reddit.com"))
+    .map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path ?? "/",
+      expires: typeof c.expirationDate === "number" ? Math.floor(c.expirationDate) : -1,
+      httpOnly: c.httpOnly ?? false,
+      secure: c.secure ?? true,
+      sameSite: mapSameSite(c.sameSite),
+    }));
+
+  if (!cookies.length) {
+    return reply.code(400).send({ error: "Aucun cookie reddit.com dans la requête." });
+  }
+
+  const state: StorageState = { cookies, origins: [] };
+  setInjectedSession(accountId, state);
+  logLine(`Session injectée pour « ${accountLabel(accountId)} » (${cookies.length} cookies).`);
+  await resetContext(); // le prochain accès relancera avec la session injectée
+
+  // Vérifie immédiatement que la session est valide.
+  try {
+    const user = await withAccount(accountId, (context) => getLoggedInUser(context));
+    logLine(user ? `Session injectée OK : u/${user}` : "Session injectée mais non connectée (cookies périmés ?)");
+    return { ok: user !== null, user, accountId };
+  } catch (error) {
+    return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 

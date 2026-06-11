@@ -82,6 +82,9 @@ export const DRAFTS_FILE = path.join(DATA_DIR, "drafts.json");
 /** Comptes ajoutés depuis l'interface (en plus de ACCOUNTS_B64). Modifiable à chaud. */
 export const RUNTIME_ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.json");
 
+/** Sessions injectées depuis le navigateur de l'utilisateur (via l'extension). */
+export const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
+
 /**
  * Protection optionnelle par Basic Auth. Si APP_PASSWORD est défini, toutes les
  * routes l'exigent (indispensable dès que l'outil est exposé sur Internet).

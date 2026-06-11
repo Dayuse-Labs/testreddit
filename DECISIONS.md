@@ -66,6 +66,44 @@ fiable, et ça couvre l'essentiel du besoin (présence de qualité multi-marché
 - **Retire du flux principal** : login automatique, publication automatique,
   programmation d'envois auto. (Le code reste dans l'historique git si besoin.)
 
+## Login Reddit : tout ce qu'on a essayé (et pourquoi ça échoue)
+
+Objectif : se connecter au compte de façon automatique/fiable. Chronologie des tentatives :
+
+| # | Approche | Résultat |
+|---|----------|----------|
+| 1 | Session exportée (`REDDIT_SESSION_B64`), créée en local | ✅ marche un temps, puis **Reddit invalide la session** (surtout IP création ≠ IP usage) |
+| 2 | Login auto par identifiants, Playwright **headless** + stealth | ❌ « An error occurred / use a different browser » (détection CDP `Runtime.enable`) |
+| 3 | + **rebrowser-playwright** (patch Runtime.enable) | ✅ page de login atteinte, mais ❌ **soumission bloquée** (CAPTCHA/anti-bot) |
+| 4 | + saisie « humaine » (char par char) + clic réel | ❌ « Une erreur est survenue lors de la connexion » (anti-abus au submit) |
+| 5 | + **proxy résidentiel** (Decodo) | ✅ lectures OK ; ❌ login toujours bloqué |
+| 6 | Login **manuel** via **noVNC** (vrai humain dans le navigateur distant) | ❌ « Erreur du serveur. Réessaie plus tard » (throttle **compte**, pas que l'IP) |
+| 7 | **API OAuth password grant** (script app) | ❌ **création d'app refusée par Reddit** (voir ci-dessous) |
+
+### Pourquoi le rate-limit malgré une IP différente
+Reddit throttle le login selon **plusieurs signaux**, surtout **le compte lui-même** (trop de
+tentatives échouées) + le fingerprint navigateur. Changer d'IP ne réinitialise pas le throttle compte.
+
+### Pourquoi tu ne peux pas créer d'app Reddit
+Depuis le **crackdown API de nov. 2025**, Reddit exige une **pré-approbation pour TOUTES les apps**,
+y compris les projets perso. La création est évaluée sur : **âge du compte, karma, email vérifié,
+historique de publication**. Nos comptes de test (créés le jour même, ~1 karma, sans historique) ne
+remplissent **aucun** critère → création refusée (message renvoyant à la Responsible Builder Policy).
+Un compte ancien, actif et avec du karma aurait plus de chances — mais pour du multi-compte de marque,
+l'approbation reste incertaine.
+
+### Conclusion
+**Il n'existe pas de login Reddit automatique, fiable et gratuit pour ce cas** — c'est volontaire
+(anti-bot/anti-multi-compte). Le **seul** endroit où le login passe : le **navigateur réel de
+l'utilisateur** (IP résidentielle, vrai humain, pas de CAPTCHA bloquant).
+
+### Solution retenue : injection de session depuis l'extension
+On réutilise ce qui marche. L'extension `testtest` (déjà connectée à Reddit dans le vrai navigateur)
+lit les cookies de session (`chrome.cookies`, y compris `reddit_session` httpOnly) et les **POST à
+l'outil** (`/api/session`). L'outil **injecte** cette session (`data/sessions.json`, prioritaire sur
+credentials/sessionB64) → lecture **et** publication possibles. Quand la session expire → **1 clic**
+dans l'extension pour la rafraîchir. Semi-manuel, mais c'est le **maximum atteignable**.
+
 ## Stack / déploiement
 - Node + TypeScript, Fastify, Playwright (lectures via old.reddit + proxy).
 - Railway (Dockerfile, headless), protégé par Basic Auth (`APP_PASSWORD`).

@@ -77,6 +77,24 @@ export const scheduleInput = replyInput.extend({
     ),
 });
 
+export const sessionInput = z.object({
+  accountId,
+  cookies: z
+    .array(
+      z.object({
+        name: z.string(),
+        value: z.string(),
+        domain: z.string(),
+        path: z.string().optional(),
+        secure: z.boolean().optional(),
+        httpOnly: z.boolean().optional(),
+        sameSite: z.string().optional(),
+        expirationDate: z.number().optional(),
+      }),
+    )
+    .min(1, "Aucun cookie reçu"),
+});
+
 export const accountCreateInput = z.object({
   label: z.string().trim().min(1, "Nom du compte requis"),
   redditUsername: z.string().trim().optional(),
