@@ -265,8 +265,26 @@ export async function startManualLogin(accountId: string): Promise<void> {
       await page
         .goto("https://www.reddit.com/login/", { waitUntil: "domcontentloaded", referer: "https://www.reddit.com/" })
         .catch(() => undefined);
+
+      // Pré-remplit email + mot de passe (sans soumettre) : il ne reste qu'à
+      // résoudre l'éventuel CAPTCHA et cliquer « Se connecter ».
+      if (account.credentials) {
+        const userField = page.locator('input[name="username"]').first();
+        const ready = await userField
+          .waitFor({ state: "visible", timeout: 12000 })
+          .then(() => true)
+          .catch(() => false);
+        if (ready) {
+          await userField.click().catch(() => undefined);
+          await userField.pressSequentially(account.credentials.username, { delay: 40 }).catch(() => undefined);
+          const passField = page.locator('input[name="password"]').first();
+          await passField.click().catch(() => undefined);
+          await passField.pressSequentially(account.credentials.password, { delay: 40 }).catch(() => undefined);
+          logLine(`Identifiants pré-remplis pour « ${account.label} » — résous le CAPTCHA si présent puis clique « Se connecter ».`);
+        }
+      }
       await page.bringToFront().catch(() => undefined);
-      logLine(`Connexion manuelle « ${account.label} » : fenêtre ouverte, connecte-toi.`);
+      logLine(`Connexion manuelle « ${account.label} » : fenêtre ouverte (proxy dédié du compte).`);
     } catch (error) {
       throw new Error(
         "Impossible d'ouvrir une fenêtre — l'outil tourne en mode serveur sans écran virtuel (ENABLE_VNC ?).",
