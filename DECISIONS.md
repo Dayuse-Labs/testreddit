@@ -112,6 +112,34 @@ l'outil** (`/api/session`). L'outil **injecte** cette session (`data/sessions.js
 credentials/sessionB64) → lecture **et** publication possibles. Quand la session expire → **1 clic**
 dans l'extension pour la rafraîchir. Semi-manuel, mais c'est le **maximum atteignable**.
 
+## ✅ Le flux qui MARCHE (validé) : login local via l'IP dédiée + injection
+
+Après avoir épuisé le login automatisé/distant (mur Reddit), la solution **validée
+en prod** combine les deux moitiés qui marchaient séparément :
+**vrai navigateur** (pas de détection d'automatisation) + **IP résidentielle dédiée**
+du compte (isolation, pas de liaison entre comptes).
+
+Par compte, une seule fois :
+1. **Bouton « Connexion locale »** (carte du compte) → affiche serveur + username
+   (jeton du compte) + mot de passe proxy, et un **script `.command`** qui ouvre un
+   **Chrome dédié à profil persistant** (`~/.reddit-profiles/reddit-<id>`) routé par
+   l'IP Decodo du compte.
+2. Au prompt proxy : coller username + mot de passe. Page Reddit → **login humain**.
+   - Si « Erreur du serveur / connexion » → l'IP est flaggée → **« Changer d'IP »**,
+     relancer, réessayer jusqu'à une IP propre (~1/3 du pool est flaggé).
+3. **Extension** (chargée UNE fois dans ce profil persistant, donc plus à réinstaller)
+   → « Envoyer ma session » → cible le compte → l'outil reçoit les cookies.
+4. L'outil **réutilise** la session et opère via **la même IP stable** → cohérent.
+
+Pourquoi ça tient : (a) cookies Reddit longue durée, (b) l'outil ne se reconnecte
+pas (réutilise la session injectée), (c) **IP stable** = pas d'invalidation par
+changement d'IP. Point faible : la sticky Decodo ne garantit l'IP que ~24 h ; au-delà
+elle peut changer (même pays). Re-login occasionnel (jours→semaines), **jamais 10×/j**.
+Pour du quasi-permanent : **IP résidentielle dédiée/statique** chez Decodo.
+
+**Indicateur par compte** : chaque carte affiche un point vert (session active) /
+rouge (expirée → refaire le login local) / gris (non vérifié), + bouton « Vérifier ».
+
 ## Stack / déploiement
 - Node + TypeScript, Fastify, Playwright (lectures via old.reddit + proxy).
 - Railway (Dockerfile, headless), protégé par Basic Auth (`APP_PASSWORD`).

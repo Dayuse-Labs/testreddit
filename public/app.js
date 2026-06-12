@@ -79,12 +79,26 @@ function renderAccountsView(accounts) {
       const del = a.removable
         ? `<button class="btn-link-danger" data-del="${esc(a.id)}">Supprimer</button>`
         : '<span class="muted-p" style="margin:0">env</span>';
+      const st = a.state || {};
+      let dotCls = "ind--unknown";
+      let stateText = "Session non vérifiée";
+      if (st.checkedAt) {
+        if (st.loggedIn) {
+          dotCls = "ind--ok";
+          stateText = `Session active${st.user ? ` · u/${esc(st.user)}` : ""}`;
+        } else {
+          dotCls = "ind--err";
+          stateText = "Session expirée — reconnexion locale requise";
+        }
+      }
+      const indicator = `<div class="account-state"><span class="ind ${dotCls}"></span><span>${stateText}</span><button class="btn-link" data-check="${esc(a.id)}">Vérifier</button></div>`;
       return `<div class="account-card${a.id === currentAccountId ? " is-current" : ""}">
         <div class="account-card-top">
           <strong>${esc(a.label)}</strong>
           <button class="btn btn-ghost btn-sm" data-use="${esc(a.id)}">Utiliser</button>
         </div>
         <div class="reco-meta">${tags}</div>
+        ${indicator}
         <div class="account-card-foot">${proxyBtn}${rotateBtn}${del}</div>
       </div>`;
     })
@@ -96,10 +110,21 @@ $("accountsList").addEventListener("click", async (e) => {
   const del = e.target.closest("[data-del]");
   const rotate = e.target.closest("[data-rotate]");
   const proxy = e.target.closest("[data-proxy]");
+  const check = e.target.closest("[data-check]");
   if (use) {
     currentAccountId = use.getAttribute("data-use");
     $("accountSelect").value = currentAccountId;
     renderAccountsView((await api("/api/accounts")).accounts || []);
+  } else if (check) {
+    const id = check.getAttribute("data-check");
+    check.disabled = true;
+    check.textContent = "Vérification…";
+    try {
+      await api(`/api/status?account=${encodeURIComponent(id)}`);
+    } catch {
+      /* l'état est lu juste après via loadAccounts */
+    }
+    await loadAccounts();
   } else if (proxy) {
     openProxyConfig(proxy.getAttribute("data-proxy"));
   } else if (rotate) {

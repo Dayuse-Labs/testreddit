@@ -879,6 +879,44 @@ td button.link-danger:hover {
   width: 100%;
 }
 
+/* ---------- Indicateur de session par compte ---------- */
+.account-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-2, #666);
+  margin: 8px 0 4px;
+}
+
+.account-state .ind {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: #b9b9c2;
+}
+
+.ind--ok {
+  background: #1faa59;
+}
+
+.ind--err {
+  background: #d23f3f;
+}
+
+.ind--pending {
+  background: #e8a13a;
+}
+
+.ind--unknown {
+  background: #b9b9c2;
+}
+
+.account-state .btn-link {
+  margin-left: auto;
+}
+
 /* ---------- Config proxy (connexion locale) ---------- */
 .proxy-steps {
   margin: 0 0 14px;

@@ -144,6 +144,11 @@ export function getCachedState(accountId: string): CachedState {
   );
 }
 
+/** Mémorise le résultat d'une vérification de connexion (alimente l'indicateur par compte). */
+export function setCheckedState(accountId: string, loggedIn: boolean, user: string | null): void {
+  stateById.set(accountId, { loggedIn, user, pending: false, checkedAt: Date.now() });
+}
+
 /**
  * Lance en arrière-plan (sans bloquer) une vérification + reconnexion auto du
  * compte, et met à jour l'état en cache. Dédupliqué par compte.

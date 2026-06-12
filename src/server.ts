@@ -46,9 +46,11 @@ import { accountCreateInput } from "./schemas.js";
 import type { Account } from "./schemas.js";
 import {
   disposeSession,
+  getCachedState,
   isSwitching,
   resetContext,
   resetLoginCooldown,
+  setCheckedState,
   startAccountSwitch,
   startManualLogin,
   withAccount,
@@ -108,8 +110,22 @@ function accountLabel(id: string | undefined): string {
 
 /** Liste des comptes configurés (sans secrets) + compte par défaut. */
 app.get("/api/accounts", async () => {
+  // On joint l'état de connexion en cache (sans relancer de navigateur) : sert
+  // d'indicateur « session OK / expirée » par compte dans l'UI.
+  const accounts = publicAccounts().map((a) => {
+    const s = getCachedState(a.id);
+    return {
+      ...a,
+      state: {
+        loggedIn: s.loggedIn,
+        user: s.user,
+        pending: s.pending,
+        checkedAt: s.checkedAt,
+      },
+    };
+  });
   return {
-    accounts: publicAccounts(),
+    accounts,
     defaultId: defaultAccountId(),
     managed: !LOCAL_MODE,
     // true = base Decodo configurée → l'UI peut générer une IP dédiée par pays.
@@ -210,8 +226,10 @@ app.get<{ Querystring: { account?: string } }>("/api/status", async (request) =>
   const accountId = request.query.account ?? defaultAccountId();
   try {
     const user = await withAccount(accountId, (context) => getLoggedInUser(context));
+    setCheckedState(accountId, user !== null, user);
     return { loggedIn: user !== null, user, accountId, switching: false };
   } catch (error) {
+    setCheckedState(accountId, false, null);
     return {
       loggedIn: false,
       user: null,
