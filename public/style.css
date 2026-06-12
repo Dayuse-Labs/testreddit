@@ -963,6 +963,17 @@ td button.link-danger:hover {
   white-space: nowrap;
 }
 
+.proxy-more {
+  margin-top: 6px;
+}
+
+.proxy-more > summary {
+  font-size: 12px;
+  color: var(--text-2, #777);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
 /* ---------- Logs en direct (drawer) ---------- */
 .log-drawer {
   position: fixed;

@@ -191,6 +191,7 @@ async function openProxyConfig(id) {
     const cfg = await api(`/api/accounts/${encodeURIComponent(id)}/proxy-config`);
     proxyCfg = cfg;
     $("proxyAccLabel").textContent = cfg.label;
+    $("proxyCmd").textContent = buildTerminalCommand(cfg);
     $("proxyServer").textContent = cfg.server;
     $("proxyUser").textContent = cfg.username;
     $("proxyPass").textContent = cfg.password;
@@ -200,9 +201,18 @@ async function openProxyConfig(id) {
   }
 }
 
+/** Commande Terminal (Mac) : profil Chrome persistant par compte + sortie via l'IP Decodo. */
+function buildTerminalCommand(cfg) {
+  return (
+    `/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome ` +
+    `--user-data-dir="$HOME/.reddit-profiles/${cfg.id}" ` +
+    `--proxy-server="${cfg.server}" "https://www.reddit.com"`
+  );
+}
+
 /** Script .command (Mac) : ouvre un Chrome dédié au compte, sortant par son IP Decodo. */
 function buildLaunchScript(cfg) {
-  const profile = `reddit-${cfg.id}`;
+  const profile = cfg.id;
   return [
     "#!/bin/bash",
     `# === Connexion Reddit isolée — ${cfg.label} ===`,

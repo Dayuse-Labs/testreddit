@@ -190,17 +190,21 @@
           le compte n'est pas relié aux autres (profil Chrome isolé).
         </p>
         <ol class="proxy-steps">
-          <li>Télécharge et double-clique le script ci-dessous (ouvre un Chrome dédié à ce compte).</li>
+          <li><strong>Copie la commande Terminal</strong> ci-dessous, ouvre le Terminal (<code>Cmd+Espace</code> → « Terminal »), colle, Entrée → un Chrome dédié s'ouvre.</li>
           <li>Quand Chrome demande les identifiants du <strong>proxy</strong>, colle l'<strong>utilisateur</strong> et le <strong>mot de passe</strong> ci-dessous.</li>
           <li>Connecte-toi à Reddit normalement (vrai humain).</li>
           <li>Envoie la session à l'outil via l'extension → connecté, isolé, cohérent.</li>
         </ol>
-        <div class="proxy-field"><label>Serveur proxy</label><div class="proxy-val"><code id="proxyServer"></code><button class="btn-link" data-copy="proxyServer">Copier</button></div></div>
-        <div class="proxy-field"><label>Utilisateur</label><div class="proxy-val"><code id="proxyUser"></code><button class="btn-link" data-copy="proxyUser">Copier</button></div></div>
-        <div class="proxy-field"><label>Mot de passe</label><div class="proxy-val"><code id="proxyPass"></code><button class="btn-link" data-copy="proxyPass">Copier</button></div></div>
-        <div class="modal-actions">
-          <button id="proxyDownload" type="button" class="btn btn-primary">⬇︎ Script de lancement (.command)</button>
-        </div>
+        <div class="proxy-field"><label>① Commande Terminal (Mac) — ouvre le Chrome dédié</label><div class="proxy-val"><code id="proxyCmd"></code><button class="btn-link" data-copy="proxyCmd">Copier</button></div></div>
+        <div class="proxy-field"><label>② Proxy — Utilisateur</label><div class="proxy-val"><code id="proxyUser"></code><button class="btn-link" data-copy="proxyUser">Copier</button></div></div>
+        <div class="proxy-field"><label>② Proxy — Mot de passe</label><div class="proxy-val"><code id="proxyPass"></code><button class="btn-link" data-copy="proxyPass">Copier</button></div></div>
+        <details class="proxy-more">
+          <summary>Détails (serveur proxy, script .command)</summary>
+          <div class="proxy-field"><label>Serveur proxy</label><div class="proxy-val"><code id="proxyServer"></code><button class="btn-link" data-copy="proxyServer">Copier</button></div></div>
+          <div class="modal-actions">
+            <button id="proxyDownload" type="button" class="btn btn-ghost btn-sm">⬇︎ Script .command (alternative)</button>
+          </div>
+        </details>
       </div>
     </div>
 
