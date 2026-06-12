@@ -21,7 +21,7 @@
       </div>
       <div class="topbar-right">
         <div id="status" class="status status--unknown">…</div>
-        <button id="manualLogin" class="btn btn-primary btn-sm" hidden title="Ouvre le navigateur Reddit dans la plateforme pour te connecter à la main">Se connecter (manuel)</button>
+        <button id="manualLogin" class="btn btn-primary btn-sm" hidden title="Connecte ce compte via son IP dédiée (vrai navigateur + extension)">Se connecter</button>
         <button id="reconnect" class="btn btn-ghost btn-sm" hidden title="Tente une reconnexion automatique (souvent bloquée par le CAPTCHA)">Reconnexion auto</button>
         <button id="logsToggle" type="button" class="btn btn-ghost btn-sm">Logs</button>
         <label class="account-label" for="accountSelect">Compte</label>
@@ -127,16 +127,32 @@
       <!-- ===== DOCUMENTATION ===== -->
       <section id="tab-doc" class="tab-panel doc" hidden>
         <div class="card">
-          <h2>Comment utiliser l'assistant</h2>
+          <h2>① Connecter un compte (à faire une fois par compte)</h2>
+          <p class="muted-p">On se connecte depuis <strong>ton vrai navigateur</strong>, en sortant par l'<strong>IP résidentielle dédiée</strong> du compte. Reddit ne bloque pas, et les comptes ne sont pas reliés entre eux.</p>
+          <ol>
+            <li><strong>Ajoute le compte</strong> (ci-dessous, onglet Comptes) : nom + <strong>pays</strong> + identifiants Reddit. L'IP dédiée est générée automatiquement.</li>
+            <li>Sur la carte du compte → <strong>« Connexion locale »</strong>.</li>
+            <li><strong>Copie la commande Terminal</strong> (bouton Copier) → ouvre le Terminal (<code>Cmd+Espace</code> → « Terminal ») → colle → <em>Entrée</em>. Un <strong>Chrome dédié</strong> s'ouvre.</li>
+            <li>Chrome demande le <strong>proxy</strong> → colle l'<strong>Utilisateur</strong> + le <strong>Mot de passe</strong> (de la même fenêtre).</li>
+            <li>Connecte-toi à <strong>Reddit</strong> normalement.
+              <ul><li>Si « Erreur du serveur / connexion » → l'IP est bloquée : clique <strong>« Changer d'IP »</strong>, relance la commande, réessaie.</li></ul>
+            </li>
+            <li>Dans <strong>ce Chrome</strong> : charge l'extension <em>une seule fois</em> (<code>chrome://extensions</code> → Mode développeur → Charger l'extension non empaquetée → dossier <code>testtest</code>), clique-la → <strong>Envoyer ma session</strong> (compte = l'id, ex. <code>france</code>).</li>
+            <li>Le point de la carte passe au <strong>🟢 vert</strong> = connecté.</li>
+          </ol>
+          <p class="note"><strong>Pourquoi ça reste connecté :</strong> l'outil réutilise ta session via la <strong>même IP stable</strong>. Re-login seulement quand le point passe au <strong>🔴 rouge</strong> (rare). Comme le profil Chrome est <strong>persistant</strong>, l'extension reste installée → tu refais juste « Envoyer ma session ».</p>
+        </div>
+        <div class="card">
+          <h2>② Préparer et publier une réponse</h2>
           <ol>
             <li>Choisis le <strong>compte</strong> (marché) en haut à droite.</li>
-            <li>Onglet <strong>Recommandations</strong> → <em>Charger</em> : l'outil propose des threads US actifs, non polémiques, à valeur ajoutée.</li>
-            <li>Sur un thread, clique <strong>Préparer une réponse</strong> → génère un <strong>brouillon IA (Gemini)</strong>, édite-le, relis l'orthographe.</li>
-            <li><strong>Enregistre le brouillon</strong> → il part dans l'onglet <strong>Brouillons</strong>.</li>
-            <li>Onglet <strong>Brouillons</strong> → <em>Copier la réponse</em> + <em>Ouvrir le post</em> → un <strong>humain publie</strong> à la main, puis <em>Marquer publié</em>.</li>
-            <li>Onglet <strong>Publié</strong> → vérifie l'activité du compte (saisis son pseudo Reddit).</li>
+            <li>Onglet <strong>Recommandations</strong> → <em>Charger</em> : threads US actifs, non polémiques, à valeur ajoutée.</li>
+            <li>Sur un thread → <strong>Préparer une réponse</strong> → génère un <strong>brouillon IA</strong>, édite-le, relis l'orthographe.</li>
+            <li><strong>Enregistre le brouillon</strong> → onglet <strong>Brouillons</strong>.</li>
+            <li>Onglet <strong>Brouillons</strong> → <em>Copier la réponse</em> + <em>Ouvrir le post</em> → un <strong>humain publie</strong>, puis <em>Marquer publié</em>.</li>
+            <li>Onglet <strong>Publié</strong> → vérifie l'activité du compte.</li>
           </ol>
-          <p class="note">Publication 100 % humaine : aucun login ni envoi automatique. Voir <code>DECISIONS.md</code> pour le pourquoi.</p>
+          <p class="note">Détail technique et historique des décisions : voir <code>DECISIONS.md</code>.</p>
         </div>
       </section>
     </main>

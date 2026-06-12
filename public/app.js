@@ -747,23 +747,15 @@ $("accountSelect").addEventListener("change", () => {
 });
 $("reconnect").addEventListener("click", reconnect);
 let vncStatusPoll = null;
-$("manualLogin").addEventListener("click", async () => {
-  openLogs();
-  $("manualLogin").disabled = true;
-  try {
-    // Ouvre le navigateur (headed) côté serveur, sur l'écran virtuel VNC.
-    await api(`/api/manual-login${accountQuery()}`, { method: "POST" });
-    // Affiche ce navigateur distant dans l'UI via noVNC.
-    $("vncFrameWrap").innerHTML =
-      '<iframe class="vnc-frame" src="/novnc/vnc.html?autoconnect=true&reconnect=true&resize=scale&path=novnc/websockify"></iframe>';
-    $("vncModal").hidden = false;
-    if (vncStatusPoll) clearInterval(vncStatusPoll);
-    vncStatusPoll = setInterval(loadStatus, 4000);
-  } catch (e) {
-    alert(`${e.message}`);
-  } finally {
-    $("manualLogin").disabled = false;
+// « Se connecter » = la méthode qui marche : connexion locale (vrai navigateur +
+// IP dédiée du compte). L'ancien navigateur distant (noVNC) est abandonné car
+// détecté par Reddit et instable en conteneur.
+$("manualLogin").addEventListener("click", () => {
+  if (!currentAccountId) {
+    alert("Choisis d'abord un compte en haut à droite.");
+    return;
   }
+  openProxyConfig(currentAccountId);
 });
 function closeVnc() {
   $("vncModal").hidden = true;
